@@ -1,7 +1,6 @@
-export const rustLessons = [
+export const rustLessons = { name: "Rust", lessons: [
   {
     id: "ownership",
-    lang: "rust",
     title: "Ownership & Borrowing",
     difficulty: "Essential",
     icon: "🔑",
@@ -65,7 +64,6 @@ fn change(s: &mut String) {
 
   {
     id: "enums-matching",
-    lang: "rust",
     title: "Enums & Pattern Matching",
     difficulty: "Core",
     icon: "🎯",
@@ -153,7 +151,6 @@ fn main() {
 
   {
     id: "error-handling",
-    lang: "rust",
     title: "Error Handling",
     difficulty: "Core",
     icon: "⚡",
@@ -255,7 +252,6 @@ fn main() {
 
   {
     id: "traits-generics",
-    lang: "rust",
     title: "Traits & Generics",
     difficulty: "Intermediate",
     icon: "🧩",
@@ -389,7 +385,6 @@ fn main() {
 
   {
     id: "lifetimes",
-    lang: "rust",
     title: "Lifetimes",
     difficulty: "Advanced",
     icon: "⏳",
@@ -495,7 +490,6 @@ fn main() {
   // ===== CODEBASE LESSONS: minigrep =====
   {
     id: "minigrep-overview",
-    lang: "rust",
     title: "minigrep: How It Fits Together",
     difficulty: "Project",
     icon: "📦",
@@ -625,7 +619,6 @@ mod tests {
 
   {
     id: "minigrep-search",
-    lang: "rust",
     title: "minigrep: Search & Lifetimes",
     difficulty: "Project",
     icon: "🔍",
@@ -711,4 +704,4 @@ fn run(config: config::Config) -> Result<(), Box<dyn std::error::Error>> {
       "How does #[cfg(test)] work — does test code ship in the binary?",
     ],
   },
-];
+] };

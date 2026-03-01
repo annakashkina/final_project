@@ -49,6 +49,16 @@
     color: #555;
     font-style: normal;
   }
+  .source a {
+    color: #555;
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .source a:hover {
+    color: #888;
+    border-bottom-color: #666;
+  }
 
   h1 {
     font-size: clamp(2rem, 4vw, 3.2rem);
@@ -228,7 +238,7 @@
 <div class="slide" id="s2">
   <h2>That gap costs <span class="orange">6&ndash;9 months</span> of ramp-up.</h2>
   <div class="body-text">That's how long it takes a new engineer to work autonomously in an unfamiliar codebase. Meanwhile, 58% of a developer's day goes to reading and understanding existing code.</div>
-  <div class="source" style="margin-top:1.5rem">Ju et al. ICSE 2021, n&thinsp;=&thinsp;226 &nbsp;|&nbsp; Xia et al. IEEE 2018, n&thinsp;=&thinsp;78 devs, 3,148 hrs</div>
+  <div class="source" style="margin-top:1.5rem"><a href="https://arxiv.org/abs/2103.05055" target="_blank">Ju et al. ICSE 2021, n&thinsp;=&thinsp;226</a> &nbsp;|&nbsp; <a href="https://ieeexplore.ieee.org/document/7997917/" target="_blank">Xia et al. IEEE 2018, n&thinsp;=&thinsp;78 devs, 3,148 hrs</a></div>
   <div class="notes">"6 to 9 months. That's the research number for how long it takes a new hire to become autonomous. And more than half of every developer's working day is just reading and understanding code that already exists. The gap is real, and it's expensive."</div>
 </div>
 
@@ -236,14 +246,14 @@
   <h2>AI makes this <span class="orange">more complicated</span>, not less</h2>
   <div class="body-text">Anthropic's 2026 study: developers using AI scored <strong style="color:#e07070">17% lower</strong> on comprehension tests than those coding by hand.</div>
   <div class="body-text" style="margin-top:0.6rem">That means new hires would take even longer to build the codebase fluency they need &mdash; the 6&ndash;9 month gap stretches, rather than shrinks.</div>
-  <div class="source">Anthropic 2026, N&thinsp;=&thinsp;52, Cohen's d&thinsp;=&thinsp;0.74, p&thinsp;=&thinsp;0.01</div>
+  <div class="source"><a href="https://www.anthropic.com/research/AI-assistance-coding-skills" target="_blank">Anthropic 2026, N&thinsp;=&thinsp;52, Cohen's d&thinsp;=&thinsp;0.74, p&thinsp;=&thinsp;0.01</a></div>
   <div class="notes">"This is the real tension. Companies want speed. But when juniors rely on AI, they don't build the understanding they need. The skills don't form. And everyone knows it — developers themselves say 'the biggest challenge is keeping your brains from rotting.'"</div>
 </div>
 
 <div class="slide" id="s4b">
   <img class="slide-img" src="efficiency-paradox.png" alt="The Efficiency Paradox: Faster Coding, Slower Shipping">
   <div class="body-text" style="margin-top:1.2rem">Coding is faster. But verifying, reviewing, and understanding has become the constraint.</div>
-  <div class="source" style="margin-top:0.8rem">Findy AI User Report, Dec 2025</div>
+  <div class="source" style="margin-top:0.8rem"><a href="https://storage.findy-code.io/storage/blobs/proxy/eyJfcmFpbHMiOnsiZGF0YSI6MTAwNTkxLCJwdXIiOiJibG9iX2lkIn19--06e5f724f6f59de33d0875f40a1016566ea77525/202512_AI%E3%83%A6%E3%83%BC%E3%82%B5%E3%82%99%E3%83%BC%E3%83%AC%E3%83%9B%E3%82%9A%E3%83%BC%E3%83%88_FIX2.pdf" target="_blank">Findy Code AI, Dec 2025</a></div>
   <div class="notes">"75% say coding speed improved with AI. But look at review time — 43% say it worsened or stayed the same. Generating code is instant now. The bottleneck moved to the human part — understanding what the code does, reviewing it, taking responsibility for it."</div>
 </div>
 
@@ -261,13 +271,13 @@
     <div class="data-num accent">g&thinsp;=&thinsp;0.50</div>
     <div class="data-desc">Retrieval practice (quizzing yourself) &mdash; one of the strongest effects in learning research</div>
   </div>
-  <div class="source" style="margin-top:1.5rem">Bastani et al., PNAS 2025, N&thinsp;&asymp;&thinsp;1,000 &nbsp;|&nbsp; Rowland 2014 meta-analysis</div>
+  <div class="source" style="margin-top:1.5rem"><a href="https://www.pnas.org/doi/10.1073/pnas.2422633122" target="_blank">Bastani et al., PNAS 2025, N&thinsp;&asymp;&thinsp;1,000</a> &nbsp;|&nbsp; <a href="https://pubmed.ncbi.nlm.nih.gov/25150680/" target="_blank">Rowland 2014 meta-analysis</a></div>
   <div class="notes">"This is a 1,000-student randomized trial. Plain ChatGPT — just ask and get answers — made students worse on exams. But when the AI was designed to guide and scaffold — give hints, not answers — learning was preserved. And retrieval practice, quizzing yourself, is one of the most replicated findings in all of learning science."</div>
 </div>
 
 <div class="slide" id="s6">
   <h2>Teams need <span class="accent">mastery</span>,<br>not just AI operators.</h2>
-  <div class="body-text">Code review, debugging, and taking ownership require real comprehension. That's the bottleneck &mdash; and generating more code doesn't address it.</div>
+  <div class="body-text">Code review, debugging, and taking ownership require real comprehension. That's the bottleneck &mdash; and generating more code only deepens it.</div>
   <div class="notes">"This came through clearly in the research. Developers at every level said the same thing in different words. Juniors want to feel like real engineers. Seniors want people on their team who can actually reason about the code. Nobody wants to just be an AI operator."</div>
 </div>
 
@@ -290,7 +300,7 @@
     <div class="arrow">&darr;</div>
     <div class="decision">Make onboarding <span class="accent">cheap</span>, autonomous, and self-paced</div>
   </div>
-  <div class="source" style="margin-top:1.2rem">Google Project Aristotle: psychological safety is the #1 predictor of team effectiveness (180 teams)</div>
+  <div class="source" style="margin-top:1.2rem"><a href="https://rework.withgoogle.com/intl/en/guides/understanding-team-effectiveness" target="_blank">Google Project Aristotle</a>: psychological safety is the #1 predictor of team effectiveness (180 teams)</div>
   <div class="notes">"Every question a new hire asks costs twice — once for the junior who feels exposed, once for the senior who loses focus. Onboarding has to be something engineers can do on their own, at their own pace, without pulling anyone away."</div>
 </div>
 
@@ -309,7 +319,7 @@
     <div class="arrow">&darr;</div>
     <div class="decision">The <span class="green">real code is always visible</span> &mdash; the source of truth, not the AI</div>
   </div>
-  <div class="source" style="margin-top:1.2rem">Stack Overflow Developer Survey 2025, n&thinsp;=&thinsp;49,009</div>
+  <div class="source" style="margin-top:1.2rem"><a href="https://survey.stackoverflow.co/2025/" target="_blank">Stack Overflow Developer Survey 2025, n&thinsp;=&thinsp;49,009</a></div>
   <div class="notes">"Only a third of developers trust what AI tells them. You can't build a learning tool where the AI is the only thing you see. The actual code has to be right there, always — that's what the learner verifies against."</div>
 </div>
 
@@ -359,7 +369,7 @@ document.addEventListener('keydown', e => {
 });
 
 document.addEventListener('click', e => {
-  if (e.target.closest('#demo-link')) return;
+  if (e.target.closest('a')) return;
   if (e.clientX > window.innerWidth / 2) show(current + 1);
   else show(current - 1);
 });

@@ -1,7 +1,6 @@
-export const cppLessons = [
+export const cppLessons = { name: "C++", lessons: [
   {
     id: "cpp-raii-smart-ptrs",
-    lang: "cpp",
     title: "RAII & Smart Pointers",
     difficulty: "Essential",
     icon: "🧠",
@@ -76,7 +75,6 @@ int main() {
   },
   {
     id: "cpp-move-semantics",
-    lang: "cpp",
     title: "Move Semantics & Rvalue References",
     difficulty: "Essential",
     icon: "🔀",
@@ -165,7 +163,6 @@ int main() {
   },
   {
     id: "cpp-templates-concepts",
-    lang: "cpp",
     title: "Templates & Concepts",
     difficulty: "Core",
     icon: "📐",
@@ -263,7 +260,6 @@ int main() {
   },
   {
     id: "cpp-lambda-functional",
-    lang: "cpp",
     title: "Lambdas & Functional Patterns",
     difficulty: "Core",
     icon: "λ",
@@ -354,7 +350,6 @@ int main() {
   },
   {
     id: "cpp-concurrency",
-    lang: "cpp",
     title: "Threads, Mutexes & Async",
     difficulty: "Advanced",
     icon: "⚡",
@@ -451,7 +446,6 @@ int main() {
   },
   {
     id: "cpp-folly-fbstring",
-    lang: "cpp",
     title: "Real Project: folly's FBString",
     difficulty: "Project",
     icon: "📦",
@@ -619,4 +613,4 @@ int main() {
       "How does this stay the same size (24 bytes) as std::string?",
     ],
   },
-];
+] };

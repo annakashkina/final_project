@@ -1,4 +1,4 @@
-import { lessons } from "./lessons.js?v=5";
+import { lessons, series } from "./lessons.js?v=5";
 
 // User ID for tracking
 function getUID() {
@@ -214,7 +214,7 @@ RULES: Be conversational. ONE question at a time. Use backtick code snippets. Re
     ? `\nLANGUAGE: Respond entirely in ${LANG_NAMES[state.lang] || state.lang}. All explanations, questions, feedback, and quizzes must be in ${LANG_NAMES[state.lang] || state.lang}. Use English only for code snippets and technical terms that have no standard translation.\n`
     : "";
 
-  return `You are a tutor teaching ${studentDesc}. They are learning ${lesson.lang || "this language"} through real code.
+  return `You are a tutor teaching ${studentDesc}. They are learning ${lesson.series} through real code.
 ${langInstruction}
 ${approach}
 
@@ -251,19 +251,9 @@ async function chat(messages) {
 function renderHome() {
   const progress = getProgress();
 
-  const langOrder = ["c", "python", "rust", "typescript", "ruby", "cpp", "meta"];
-  const langNames = { c: "C", rust: "Rust", python: "Python", typescript: "TypeScript", ruby: "Ruby", cpp: "C++", meta: "How codeprobe works" };
-  const grouped = {};
-  for (const l of lessons) {
-    const lang = l.lang || "rust";
-    if (!grouped[lang]) grouped[lang] = [];
-    grouped[lang].push(l);
-  }
-
-  $("#lesson-grid").innerHTML = langOrder
-    .filter(lang => grouped[lang])
-    .map(lang => {
-      const cards = grouped[lang].map(l => {
+  $("#lesson-grid").innerHTML = series
+    .map(s => {
+      const cards = s.lessons.map(l => {
         const p = progress[l.id];
         let badge = "";
         if (p && shouldRevisit(l.id)) badge = `<span class="card-badge revisit">revisit</span>`;
@@ -276,7 +266,7 @@ function renderHome() {
         </div>`;
       }).join("");
       return `<div class="lang-section">
-        <h2 class="lang-header">${langNames[lang]}</h2>
+        <h2 class="lang-header">${s.name}</h2>
         <div class="lang-row">${cards}</div>
       </div>`;
     }).join("");
@@ -304,27 +294,14 @@ function renderCode(idx) {
   const codeEl = $("#code-display");
   let code, langClass;
 
-  // Detect highlight language — for meta lessons, infer from filename or code
-  const hljsLang = (lang, filename) => {
-    if (lang && lang !== "meta") return lang;
-    if (filename) {
-      if (filename.includes(".py")) return "python";
-      if (filename.includes(".js")) return "javascript";
-      if (filename.includes(".ts")) return "typescript";
-      if (filename.includes(".rb")) return "ruby";
-      if (filename.includes(".c") && !filename.includes(".cpp")) return "c";
-      if (filename.includes(".cpp")) return "cpp";
-      if (filename.includes(".rs")) return "rust";
-    }
-    return null;  // let hljs auto-detect for meta single-file lessons
-  };
-
-  const extMap = { rust: "rs", python: "py", typescript: "ts", javascript: "js", c: "c", cpp: "cpp", ruby: "rb" };
+  // File extension → hljs language name (single source of truth)
+  const EXT_LANG = { c: "c", rs: "rust", py: "python", ts: "typescript", js: "javascript", cpp: "cpp", rb: "ruby" };
 
   if (lesson.files) {
     idx = idx ?? state.fileIdx;
     code = lesson.files[idx].code;
-    langClass = `language-${hljsLang(lesson.lang, lesson.files[idx].name)}`;
+    const ext = lesson.files[idx].name.match(/\.(\w+)/)?.[1];
+    langClass = ext && EXT_LANG[ext] ? `language-${EXT_LANG[ext]}` : "";
     $("#file-tabs").innerHTML = lesson.files.map((f, i) =>
       `<span class="file-tab ${i === idx ? "active" : ""}" data-idx="${i}">${f.name}</span>`
     ).join("");
@@ -333,10 +310,10 @@ function renderCode(idx) {
     );
   } else {
     code = lesson.code;
-    const effectiveLang = hljsLang(lesson.lang);
-    langClass = effectiveLang ? `language-${effectiveLang}` : null;
+    langClass = null; // hljs auto-detect
     const name = lesson.title.toLowerCase().replace(/[^a-z0-9]+/g, "_");
-    const ext = extMap[effectiveLang] || extMap[lesson.lang] || "js";
+    const langKey = lesson.series === "C++" ? "cpp" : lesson.series.toLowerCase();
+    const ext = Object.keys(EXT_LANG).find(e => EXT_LANG[e] === langKey) || "js";
     $("#file-tabs").innerHTML = `<span class="file-tab active">${name}.${ext}</span>`;
   }
 
@@ -550,14 +527,14 @@ async function sendMsg() {
   await getLLMResponse();
 }
 
-function copyForClaude() {
+function copyPrompt() {
   const code = state.lesson.files
     ? state.lesson.files.map(f => `// --- ${f.name} ---\n${f.code}`).join("\n\n")
     : state.lesson.code;
   const q = $("#user-questions").value.trim();
-  const prompt = `I'm learning ${state.lesson.lang || "Rust"}. Here's code I'm studying:\n\n\`\`\`\n${code}\n\`\`\`\n\n${q ? `My questions:\n${q}\n\n` : ""}Teach me using active learning: explain concepts, then quiz me. One question at a time. Wait for my answer.`;
-  navigator.clipboard.writeText(prompt).then(() => toast("copied — paste into Claude"));
-  track("copy_claude", { lesson: state.lesson.id });
+  const prompt = `I'm learning ${state.lesson.series}. Here's code I'm studying:\n\n\`\`\`\n${code}\n\`\`\`\n\n${q ? `My questions:\n${q}\n\n` : ""}Teach me using active learning: explain concepts, then quiz me. One question at a time. Wait for my answer.`;
+  navigator.clipboard.writeText(prompt).then(() => toast("copied — paste into any LLM"));
+  track("copy_prompt", { lesson: state.lesson.id });
 }
 
 function toast(msg) {
@@ -589,7 +566,7 @@ $("#lang-select").addEventListener("change", () => {
   localStorage.setItem("codeprobe_lang", state.lang);
   track("lang_toggle", { lang: state.lang });
 });
-$("#copy-claude-btn").addEventListener("click", copyForClaude);
+$("#copy-prompt-btn").addEventListener("click", copyPrompt);
 $("#copy-code-btn").addEventListener("click", () => {
   const code = state.lesson.files ? state.lesson.files[state.fileIdx].code : state.lesson.code;
   navigator.clipboard.writeText(code).then(() => toast("copied"));

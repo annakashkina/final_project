@@ -28,42 +28,38 @@ Works with Groq, xAI, OpenAI, Ollama, or any provider with an OpenAI-compatible 
 
 ## Writing lessons
 
-A lesson is a JS object in `lessons/`. Each file exports an array grouped by language or topic.
-
-### Single-file lesson
+Each file in `lessons/` exports a series object with a `name` and a `lessons` array:
 
 ```js
-{
-  id: "auth-middleware",
-  lang: "python",
-  title: "How Auth Middleware Works",
-  difficulty: "Intermediate",
-  concepts: [
-    "Request lifecycle",
-    "Token validation",
-    "Middleware chaining",
-  ],
-  code: `def auth_middleware(request):
-    token = request.headers.get("Authorization")
-    if not token or not verify(token):
-        return Response(401)
-    request.user = decode(token)
-    return next(request)`,
-  seedQuestions: [
-    "What happens if the Authorization header is missing?",
-    "Where does request.user come from downstream?",
-  ],
-}
+export const pythonLessons = { name: "Python", lessons: [
+  {
+    id: "auth-middleware",
+    title: "How Auth Middleware Works",
+    difficulty: "Intermediate",
+    concepts: [
+      "Request lifecycle",
+      "Token validation",
+      "Middleware chaining",
+    ],
+    code: `def auth_middleware(request):
+      token = request.headers.get("Authorization")
+      if not token or not verify(token):
+          return Response(401)
+      request.user = decode(token)
+      return next(request)`,
+    seedQuestions: [
+      "What happens if the Authorization header is missing?",
+      "Where does request.user come from downstream?",
+    ],
+  },
+] };
 ```
-
-### Multi-file lesson
 
 Use `files` instead of `code` when a concept spans multiple files:
 
 ```js
 {
   id: "api-route-flow",
-  lang: "python",
   title: "Request Flow: Route to DB",
   files: [
     { name: "routes.py", code: `...` },
@@ -80,6 +76,8 @@ Use `files` instead of `code` when a concept spans multiple files:
 
 The most efficient way to create new lessons is to point Claude Code, Codex or similar at your source and have it generate lesson objects using existing lessons as a template. Review and update as necessary.
 
+Similarly, you can run Claude Code, Codex or similar periodically to check if the existing lessons are up-to-date with existing codebase, and update.
+
 Each lesson gets its own id: to update the existing lesson without side-effects, update the lesson and keep the id. If you want the lesson to appear new - update the id as well.
 
 ### Lesson fields
@@ -87,7 +85,6 @@ Each lesson gets its own id: to update the existing lesson without side-effects,
 | Field | Required | Description |
 |---|---|---|
 | `id` | yes | Unique identifier |
-| `lang` | yes | Language tag |
 | `title` | yes | Short title |
 | `difficulty` | yes | `Beginner`, `Intermediate`, `Advanced`, `Essential` |
 | `concepts` | yes | Array of concept strings the lesson covers |

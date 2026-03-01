@@ -1,7 +1,6 @@
-export const pythonLessons = [
+export const pythonLessons = { name: "Python", lessons: [
   {
     id: "py-lists-comprehensions",
-    lang: "python",
     title: "Lists, Slicing & Comprehensions",
     difficulty: "Essential",
     icon: "🐍",
@@ -46,7 +45,6 @@ combined = [*a, *b]        # [1, 2, 3, 4, 5, 6]`,
 
   {
     id: "py-dicts-sets",
-    lang: "python",
     title: "Dicts, Sets & Unpacking",
     difficulty: "Essential",
     icon: "🐍",
@@ -93,7 +91,6 @@ print(Counter(words).most_common(2))  # [('the', 3), ('cat', 2)]`,
 
   {
     id: "py-functions",
-    lang: "python",
     title: "Functions: Flexible & First-Class",
     difficulty: "Essential",
     icon: "🐍",
@@ -144,7 +141,6 @@ print(add("b"))  # ['a', 'b'] — same list!`,
 
   {
     id: "py-classes",
-    lang: "python",
     title: "Classes & Magic Methods",
     difficulty: "Core",
     icon: "🐍",
@@ -206,7 +202,6 @@ print(p == Point(3, 4))  # True — auto __eq__`,
 
   {
     id: "py-error-context",
-    lang: "python",
     title: "Error Handling & Context Managers",
     difficulty: "Core",
     icon: "🐍",
@@ -264,7 +259,6 @@ with timer("sum"):
 
   {
     id: "py-decorators",
-    lang: "python",
     title: "Decorators & Closures",
     difficulty: "Core",
     icon: "🐍",
@@ -327,7 +321,6 @@ print(fetch("https://api.example.com"))`,
   // ===== CODEBASE LESSON: Flask =====
   {
     id: "py-flask-api",
-    lang: "python",
     title: "Flask: Build a REST API",
     difficulty: "Project",
     icon: "📦",
@@ -401,7 +394,6 @@ curl -X POST http://localhost:5000/books \\
 
   {
     id: "py-numpy",
-    lang: "python",
     title: "NumPy: Arrays & Vectorization",
     difficulty: "Core",
     icon: "🐍",
@@ -453,7 +445,6 @@ total = big.sum()    # one C call, not 1M Python iterations`,
 
   {
     id: "py-pandas",
-    lang: "python",
     title: "Pandas: DataFrames in 5 Minutes",
     difficulty: "Core",
     icon: "🐍",
@@ -512,4 +503,4 @@ result = (df
       "How does method chaining work with the parentheses style?",
     ],
   },
-];
+] };

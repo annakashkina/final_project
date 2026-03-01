@@ -1,7 +1,6 @@
-export const rubyLessons = [
+export const rubyLessons = { name: "Ruby", lessons: [
   {
     id: "ruby-blocks-procs",
-    lang: "ruby",
     title: "Blocks, Procs & Lambdas",
     difficulty: "Essential",
     icon: "🧱",
@@ -49,7 +48,6 @@ puts transform([1, 2, 3]) { |x| x ** 2 }.inspect  # [1, 4, 9]`,
 
   {
     id: "ruby-classes-modules",
-    lang: "ruby",
     title: "Classes, Modules & Mixins",
     difficulty: "Essential",
     icon: "💎",
@@ -110,7 +108,6 @@ puts Person.ancestors.inspect
 
   {
     id: "ruby-enumerable",
-    lang: "ruby",
     title: "Enumerable & Iterators",
     difficulty: "Core",
     icon: "🔄",
@@ -150,7 +147,6 @@ puts squares.first(5).inspect  # [4, 16, 36, 64, 100]`,
 
   {
     id: "ruby-symbols-hashes",
-    lang: "ruby",
     title: "Symbols & Hashes",
     difficulty: "Essential",
     icon: "🔑",
@@ -210,7 +206,6 @@ log("deployed", level: :warn, tags: [:prod, :v2])
   // ===== CODEBASE LESSON: Sidekiq =====
   {
     id: "ruby-sidekiq-worker",
-    lang: "ruby",
     title: "Sidekiq: Background Jobs in Practice",
     difficulty: "Project",
     icon: "📦",
@@ -314,4 +309,4 @@ ReportWorker.perform_async("weekly", "2026-02-01")
       "Why pass user_id instead of the user object to perform_async?",
     ],
   },
-];
+] };

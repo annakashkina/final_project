@@ -1,7 +1,6 @@
-export const typescriptLessons = [
+export const typescriptLessons = { name: "TypeScript", lessons: [
   {
     id: "ts-types",
-    lang: "typescript",
     title: "Type System Deep Dive",
     difficulty: "Core",
     icon: "🔷",
@@ -98,4 +97,4 @@ shapes.forEach(s => console.log(\`\${s.kind}: \${area(s).toFixed(2)}\`));`,
       "Why use Omit<User, 'id'> instead of just writing a new interface?",
     ],
   },
-];
+] };

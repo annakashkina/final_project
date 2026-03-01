@@ -6,12 +6,17 @@ import { rubyLessons } from "./lessons/ruby.js";
 import { cppLessons } from "./lessons/cpp.js";
 import { metaLessons } from "./lessons/meta.js";
 
-export const lessons = [
-  ...cLessons,
-  ...rustLessons,
-  ...pythonLessons,
-  ...typescriptLessons,
-  ...rubyLessons,
-  ...cppLessons,
-  ...metaLessons,
+export const series = [
+  cLessons,
+  rustLessons,
+  pythonLessons,
+  typescriptLessons,
+  rubyLessons,
+  cppLessons,
+  metaLessons,
 ];
+
+export const lessons = series.flatMap(s => {
+  for (const l of s.lessons) l.series = s.name;
+  return s.lessons;
+});

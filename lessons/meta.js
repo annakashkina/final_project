@@ -1,7 +1,6 @@
-export const metaLessons = [
+export const metaLessons = { name: "How codeprobe works", lessons: [
   {
     id: "meta-lessons",
-    lang: "meta",
     title: "How Lessons Are Defined",
     difficulty: "Project",
     icon: "📦",
@@ -20,14 +19,14 @@ export const metaLessons = [
     },
     files: [
       {
-        name: "lessons.js",
-        code: `// Every lesson on the site is an object in this array.
-// The app reads it to build the home screen and lesson view.
+        name: "lessons/c.js",
+        code: `// Each file in lessons/ exports a series: { name, lessons }.
+// The name is shown as the section header on the home screen.
+// The lessons array contains the lesson objects.
 
-export const lessons = [
+export const cLessons = { name: "C", lessons: [
   {
     id: "c-pointers",
-    lang: "c",
     title: "Pointers & Addresses",
     difficulty: "Essential",
 
@@ -55,8 +54,8 @@ export const lessons = [
       "What happens if you dereference NULL?",
     ],
   },
-  // ... 44 lessons across C, Rust, Python, TypeScript, Ruby, C++
-];`,
+  // ...more lessons in this series
+] };`,
       },
       {
         name: "app.js",
@@ -81,7 +80,6 @@ function openLesson(id) {
 
   {
     id: "meta-flow",
-    lang: "meta",
     title: "The Lesson Flow",
     difficulty: "Project",
     icon: "🔄",
@@ -151,7 +149,6 @@ if (state.mode !== "quick" && state.exchangeCount >= 4)
 
   {
     id: "meta-prompt",
-    lang: "meta",
     title: "Building the Tutor Prompt",
     difficulty: "Project",
     icon: "🧩",
@@ -228,7 +225,6 @@ STUDENT QUESTIONS: \${questions || "(none)"}\`;
 
   {
     id: "meta-chat",
-    lang: "meta",
     title: "Browser Sends, Server Replies",
     difficulty: "Project",
     icon: "💬",
@@ -319,7 +315,6 @@ self._json_response(200, {"reply": reply})
 
   {
     id: "meta-server",
-    lang: "meta",
     title: "How the Server Works",
     difficulty: "Project",
     icon: "🖥️",
@@ -400,7 +395,6 @@ http.server.ThreadingHTTPServer(("", 3000), Handler).serve_forever()`,
 
   {
     id: "meta-llm",
-    lang: "meta",
     title: "Calling the AI (Any LLM Provider)",
     difficulty: "Project",
     icon: "🤖",
@@ -469,7 +463,6 @@ if len(reply.split()) < 40:
 
   {
     id: "meta-progress",
-    lang: "meta",
     title: "Progress & Personalization",
     difficulty: "Project",
     icon: "📊",
@@ -547,7 +540,6 @@ function getKnownLangs() {
 
   {
     id: "meta-security",
-    lang: "meta",
     title: "Input Validation & Security",
     difficulty: "Project",
     icon: "🛡️",
@@ -636,4 +628,4 @@ def validate_messages(messages):
       "Why limit to one system message at position 0 — what's the prompt injection risk?",
     ],
   },
-];
+] };

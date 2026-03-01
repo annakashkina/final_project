@@ -1,7 +1,6 @@
-export const cLessons = [
+export const cLessons = { name: "C", lessons: [
   {
     id: "c-if-else",
-    lang: "c",
     title: "If, Else & Comparisons",
     difficulty: "Beginner",
     icon: "🔀",
@@ -53,7 +52,6 @@ int main(void) {
 
   {
     id: "c-loops",
-    lang: "c",
     title: "Loops: for, while, do-while",
     difficulty: "Beginner",
     icon: "🔁",
@@ -110,7 +108,6 @@ int main(void) {
 
   {
     id: "c-switch",
-    lang: "c",
     title: "Switch & Fall-through",
     difficulty: "Beginner",
     icon: "🔀",
@@ -159,7 +156,6 @@ int main(void) {
 
   {
     id: "c-printf-format",
-    lang: "c",
     title: "printf & Format Strings",
     difficulty: "Beginner",
     icon: "🖨️",
@@ -210,7 +206,6 @@ int main(void) {
 
   {
     id: "c-argc-argv",
-    lang: "c",
     title: "argc & argv: Command-Line Args",
     difficulty: "Beginner",
     icon: "💻",
@@ -256,7 +251,6 @@ int main(int argc, char *argv[]) {
 
   {
     id: "c-pointers",
-    lang: "c",
     title: "Pointers & Addresses",
     difficulty: "Essential",
     icon: "🎯",
@@ -297,7 +291,6 @@ int main(void) {
 
   {
     id: "c-arrays-strings",
-    lang: "c",
     title: "Arrays & Strings",
     difficulty: "Essential",
     icon: "📝",
@@ -361,7 +354,6 @@ int main(void) {
 
   {
     id: "c-malloc",
-    lang: "c",
     title: "malloc & free",
     difficulty: "Core",
     icon: "🧠",
@@ -428,7 +420,6 @@ int main(void) {
 
   {
     id: "c-structs",
-    lang: "c",
     title: "Structs",
     difficulty: "Core",
     icon: "🏗️",
@@ -497,4 +488,4 @@ int main(void) {
       "Why use typedef instead of writing 'struct Student' everywhere?",
     ],
   },
-];
+] };
