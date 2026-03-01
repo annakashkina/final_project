@@ -221,28 +221,21 @@
 <body>
 
 <div class="slide" id="s1">
-  <h1>Between learning to code and working with real codebases, there's a <span class="accent">gap</span>.</h1>
-  <div class="notes">Warm, not dramatic. "Most of us have felt it. You learn the language, you do the exercises — and then you open a real project and it's a completely different experience."</div>
+  <h1>Between knowing how to code and working fluently with a specific codebase, there's a <span class="accent">gap</span>.</h1>
+  <div class="notes">"Most of us have felt it. You know the language, you've built things before — and then you open a real project at a new job and it's a completely different experience."</div>
 </div>
 
 <div class="slide" id="s2">
-  <div class="big-stat accent">57%</div>
-  <div class="stat-label">of CS students experience frequent imposter syndrome</div>
-  <div class="source">ACM SIGCSE 2020, n&thinsp;=&thinsp;200+</div>
-  <div class="body-text" style="margin-top:1.8rem">Developers search Reddit and Google before asking a teammate &mdash; not because it's faster, but because asking feels risky.</div>
-  <div class="notes">"This isn't just feelings — it's measured. More than half. And the way people cope is they search privately, because asking a colleague means admitting what you don't know."</div>
-</div>
-
-<div class="slide" id="s3">
-  <h2>I've been a software engineer for 6 years.<br>I've been the confused junior too.</h2>
-  <div class="body-text">I wanted to understand why this gap is so hard to close &mdash; so I spent months in Reddit threads, Hacker News, interviews, and developer surveys studying what developers actually experience.</div>
-  <div class="notes">"Twice — once at my first job, and again when I switched domains. Both times it felt like starting over. I wanted to understand why."</div>
+  <h2>That gap costs <span class="orange">6&ndash;9 months</span> of ramp-up.</h2>
+  <div class="body-text">That's how long it takes a new engineer to work autonomously in an unfamiliar codebase. Meanwhile, 58% of a developer's day goes to reading and understanding existing code.</div>
+  <div class="source" style="margin-top:1.5rem">Ju et al. ICSE 2021, n&thinsp;=&thinsp;226 &nbsp;|&nbsp; Xia et al. IEEE 2018, n&thinsp;=&thinsp;78 devs, 3,148 hrs</div>
+  <div class="notes">"6 to 9 months. That's the research number for how long it takes a new hire to become autonomous. And more than half of every developer's working day is just reading and understanding code that already exists. The gap is real, and it's expensive."</div>
 </div>
 
 <div class="slide" id="s4">
   <h2>AI makes this <span class="orange">more complicated</span>, not less</h2>
   <div class="body-text">Anthropic's 2026 study: developers using AI scored <strong style="color:#e07070">17% lower</strong> on comprehension tests than those coding by hand.</div>
-  <div class="body-text" style="margin-top:0.6rem">But employers want faster onboarding and faster shipping. Direct conflict.</div>
+  <div class="body-text" style="margin-top:0.6rem">That means new hires would take even longer to build the codebase fluency they need &mdash; the 6&ndash;9 month gap stretches, rather than shrinks.</div>
   <div class="source">Anthropic 2026, N&thinsp;=&thinsp;52, Cohen's d&thinsp;=&thinsp;0.74, p&thinsp;=&thinsp;0.01</div>
   <div class="notes">"This is the real tension. Companies want speed. But when juniors rely on AI, they don't build the understanding they need. The skills don't form. And everyone knows it — developers themselves say 'the biggest challenge is keeping your brains from rotting.'"</div>
 </div>
@@ -250,6 +243,7 @@
 <div class="slide" id="s4b">
   <img class="slide-img" src="efficiency-paradox.png" alt="The Efficiency Paradox: Faster Coding, Slower Shipping">
   <div class="body-text" style="margin-top:1.2rem">Coding is faster. But verifying, reviewing, and understanding has become the constraint.</div>
+  <div class="source" style="margin-top:0.8rem">Findy AI User Report, Dec 2025</div>
   <div class="notes">"75% say coding speed improved with AI. But look at review time — 43% say it worsened or stayed the same. Generating code is instant now. The bottleneck moved to the human part — understanding what the code does, reviewing it, taking responsibility for it."</div>
 </div>
 
@@ -272,8 +266,8 @@
 </div>
 
 <div class="slide" id="s6">
-  <h2>People want <span class="accent">mastery</span>,<br>not to be AI operators.</h2>
-  <div class="body-text">Human understanding is still valued &mdash; by people themselves and by organizations. There's a bottleneck in code review, debugging, and taking responsibility that requires real comprehension.</div>
+  <h2>Teams need <span class="accent">mastery</span>,<br>not just AI operators.</h2>
+  <div class="body-text">Code review, debugging, and taking ownership require real comprehension. That's the bottleneck &mdash; and generating more code doesn't address it.</div>
   <div class="notes">"This came through clearly in the research. Developers at every level said the same thing in different words. Juniors want to feel like real engineers. Seniors want people on their team who can actually reason about the code. Nobody wants to just be an AI operator."</div>
 </div>
 
@@ -292,11 +286,12 @@
 
 <div class="slide" id="s9">
   <div class="insight-pair">
-    <div class="finding">Asking for help has social costs &mdash; developers avoid it to not look incompetent</div>
+    <div class="finding">Asking for help has social and economic costs &mdash; every question pulls a senior engineer away from their work</div>
     <div class="arrow">&darr;</div>
-    <div class="decision">Make <span class="accent">learning</span> private and judgment-free</div>
+    <div class="decision">Make onboarding <span class="accent">cheap</span>, autonomous, and self-paced</div>
   </div>
-  <div class="notes">"The research showed that people avoid asking because it exposes what they don't know. So the learning space has to be private. No one's watching. You can ask anything."</div>
+  <div class="source" style="margin-top:1.2rem">Google Project Aristotle: psychological safety is the #1 predictor of team effectiveness (180 teams)</div>
+  <div class="notes">"Every question a new hire asks costs twice — once for the junior who feels exposed, once for the senior who loses focus. Onboarding has to be something engineers can do on their own, at their own pace, without pulling anyone away."</div>
 </div>
 
 <div class="slide" id="s10">
@@ -310,23 +305,24 @@
 
 <div class="slide" id="s11">
   <div class="insight-pair">
-    <div class="finding">46% of developers don't trust AI output &mdash; it's confidently wrong</div>
+    <div class="finding">Only 33% of developers trust AI output</div>
     <div class="arrow">&darr;</div>
     <div class="decision">The <span class="green">real code is always visible</span> &mdash; the source of truth, not the AI</div>
   </div>
-  <div class="notes">"If almost half of developers don't trust what AI says, you can't build a learning tool where the AI is the only thing you see. The actual code has to be right there, always."</div>
+  <div class="source" style="margin-top:1.2rem">Stack Overflow Developer Survey 2025, n&thinsp;=&thinsp;49,009</div>
+  <div class="notes">"Only a third of developers trust what AI tells them. You can't build a learning tool where the AI is the only thing you see. The actual code has to be right there, always — that's what the learner verifies against."</div>
 </div>
 
 <div class="slide" id="s12">
-  <h2>Where this could go</h2>
-  <div class="body-text">Organizations could craft lesson series around their own architecture &mdash; to teach new engineers their specific codebase and principles.</div>
-  <div class="body-text" style="margin-top:0.6rem">Active learning means you prove to yourself that you understand. That builds <span class="accent">skills</span> and <span class="accent">confidence</span> together.</div>
-  <div class="notes">"This started as a tool for students, but I ended up using it myself to learn Rust and refresh C++. The real potential is for organizations — imagine onboarding lessons built around your actual codebase, where new engineers don't just read docs but actually work through the code and prove they get it."</div>
+  <h2>What this enables</h2>
+  <div class="body-text">Engineers can build context on any part of the codebase &mdash; before a PR, after a team change, or when revisiting code they haven't touched in months.</div>
+  <div class="body-text" style="margin-top:0.6rem">The dashboard shows you who's learning what &mdash; and where they struggle.</div>
+  <div class="notes">"This isn't just for onboarding new hires. Any time an engineer needs to touch an unfamiliar part of the codebase, they can work through a lesson first and build the context they need. And because it's systematic, you can actually see progress — who's covered what, where the gaps are."</div>
 </div>
 
 <div class="slide" id="s13">
   <h1>Even in the AI era, human mastery becomes <span class="accent">more</span> valuable.</h1>
-  <div class="body-text">And we can get there.</div>
+  <div class="body-text">And it can be built systematically.</div>
   <div class="notes">Let this land. Then: "I'd love to hear what you think."</div>
 </div>
 
