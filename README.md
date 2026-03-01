@@ -1,6 +1,6 @@
 # codeprobe
 
-Active learning tool for codebases. Engineers learn by reading real code and being quizzed on it — not by reading docs.
+Active learning tool for codebases. Engineers learn by reading real code and being quizzed on it, instead of reading the docs.
 
 An AI tutor guides the learner through code snippets, asks questions, and verifies understanding before moving on. Based on research showing that scaffolded AI (+127% practice gains, no exam loss) and retrieval practice (g=0.50) outperform passive reading and plain chatbots.
 
@@ -20,7 +20,7 @@ Environment variables:
 
 | Variable | Description | Example |
 |---|---|---|
-| `LLM_API_KEY` | API key (omit for keyless local models) | `gsk_...` |
+| `LLM_API_KEY` | API key (omit for keyless local models) | `sk-...` |
 | `LLM_API_URL` | Chat completions endpoint | `https://api.groq.com/openai/v1/chat/completions` |
 | `LLM_MODEL` | Model identifier | `llama-3.3-70b-versatile` |
 
@@ -76,11 +76,11 @@ Use `files` instead of `code` when a concept spans multiple files:
 }
 ```
 
-### Generating lessons with AI
+### Generating lessons
 
-Point Claude Code or Codex at your source and have it generate lesson objects using existing lessons as a template. Review and update as necessary.
+The most efficient way to create new lessons is to point Claude Code, Codex or similar at your source and have it generate lesson objects using existing lessons as a template. Review and update as necessary.
 
-Each lesson gets has its own id, so if you want to update the existing lesson without users noticing, update the id only. If you want the lesson to appear new - update the id as well.
+Each lesson gets its own id: to update the existing lesson without side-effects, update the lesson and keep the id. If you want the lesson to appear new - update the id as well.
 
 ### Lesson fields
 
