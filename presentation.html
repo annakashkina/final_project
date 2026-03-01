@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>codeprobe — presentation</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #1a1a22;
+    color: #e0e0e0;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  .slide {
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    width: 100vw;
+    padding: 8vh 10vw;
+    text-align: center;
+    animation: fadeIn 0.3s ease;
+  }
+  .slide.active { display: flex; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── typography ── */
+  .quote {
+    font-size: clamp(1.4rem, 2.6vw, 2.2rem);
+    line-height: 1.5;
+    font-style: italic;
+    color: #bbb;
+    max-width: 780px;
+  }
+
+  .source {
+    margin-top: 1.2rem;
+    font-size: clamp(0.8rem, 1.2vw, 1rem);
+    color: #555;
+    font-style: normal;
+  }
+
+  h1 {
+    font-size: clamp(2rem, 4vw, 3.2rem);
+    font-weight: 700;
+    line-height: 1.2;
+    max-width: 860px;
+  }
+
+  h2 {
+    font-size: clamp(1.5rem, 2.8vw, 2.3rem);
+    font-weight: 600;
+    line-height: 1.35;
+    max-width: 820px;
+  }
+
+  .body-text {
+    font-size: clamp(1.05rem, 1.7vw, 1.3rem);
+    color: #999;
+    margin-top: 1.2rem;
+    max-width: 680px;
+    line-height: 1.55;
+  }
+
+  .big-stat {
+    font-size: clamp(3.5rem, 8vw, 6rem);
+    font-weight: 800;
+    line-height: 1;
+  }
+
+  .stat-label {
+    font-size: clamp(1rem, 1.7vw, 1.3rem);
+    color: #888;
+    margin-top: 0.6rem;
+    max-width: 550px;
+    line-height: 1.4;
+  }
+
+  .accent { color: #6aadff; }
+  .orange { color: #e8a050; }
+  .green  { color: #6dbe6d; }
+  .red    { color: #e07070; }
+  .dim    { color: #666; }
+
+  /* ── research data rows ── */
+  .data-row {
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+    max-width: 700px;
+    text-align: left;
+    margin-top: 1.2rem;
+  }
+  .data-num {
+    font-size: clamp(1.8rem, 3.5vw, 2.6rem);
+    font-weight: 700;
+    min-width: 100px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+  .data-desc {
+    font-size: clamp(0.95rem, 1.5vw, 1.15rem);
+    color: #999;
+    line-height: 1.45;
+  }
+
+  /* ── insight → decision ── */
+  .insight-pair {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    align-items: center;
+    max-width: 750px;
+  }
+  .insight-pair .finding {
+    font-size: clamp(1.05rem, 1.8vw, 1.35rem);
+    color: #888;
+    line-height: 1.45;
+  }
+  .insight-pair .arrow {
+    font-size: 1.4rem;
+    color: #6aadff44;
+  }
+  .insight-pair .decision {
+    font-size: clamp(1.3rem, 2.3vw, 1.8rem);
+    font-weight: 600;
+    line-height: 1.4;
+    color: #e0e0e0;
+  }
+
+  /* ── vs layout ── */
+  .vs {
+    display: flex;
+    gap: 3vw;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .vs-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .vs-num {
+    font-size: clamp(2.5rem, 5.5vw, 4rem);
+    font-weight: 800;
+    line-height: 1;
+  }
+  .vs-label {
+    font-size: clamp(0.85rem, 1.3vw, 1.05rem);
+    color: #777;
+    margin-top: 0.5rem;
+    max-width: 200px;
+    line-height: 1.35;
+  }
+  .vs-divider {
+    font-size: clamp(1.3rem, 2.5vw, 2rem);
+    color: #444;
+    font-weight: 300;
+  }
+
+  /* ── image slide ── */
+  .slide-img {
+    max-width: min(85vw, 820px);
+    max-height: 55vh;
+    border-radius: 8px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+  }
+
+  .demo-label {
+    font-size: clamp(0.9rem, 1.3vw, 1.1rem);
+    color: #555;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-bottom: 0.8rem;
+  }
+
+  /* ── progress + nav ── */
+  #progress {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    height: 2px;
+    background: #6aadff;
+    transition: width 0.3s ease;
+    z-index: 100;
+  }
+
+  #counter {
+    position: fixed;
+    bottom: 10px;
+    right: 16px;
+    font-size: 0.75rem;
+    color: #3a3a3a;
+    font-variant-numeric: tabular-nums;
+    z-index: 100;
+  }
+
+  #hint {
+    position: fixed;
+    bottom: 10px;
+    left: 16px;
+    font-size: 0.7rem;
+    color: #2a2a2a;
+    z-index: 100;
+  }
+
+  .notes { display: none; }
+</style>
+</head>
+<body>
+
+<div class="slide" id="s1">
+  <h1>Between learning to code and working with real codebases, there's a <span class="accent">gap</span>.</h1>
+  <div class="notes">Warm, not dramatic. "Most of us have felt it. You learn the language, you do the exercises — and then you open a real project and it's a completely different experience."</div>
+</div>
+
+<div class="slide" id="s2">
+  <div class="big-stat accent">57%</div>
+  <div class="stat-label">of CS students experience frequent imposter syndrome</div>
+  <div class="source">ACM SIGCSE 2020, n&thinsp;=&thinsp;200+</div>
+  <div class="body-text" style="margin-top:1.8rem">Developers search Reddit and Google before asking a teammate &mdash; not because it's faster, but because asking feels risky.</div>
+  <div class="notes">"This isn't just feelings — it's measured. More than half. And the way people cope is they search privately, because asking a colleague means admitting what you don't know."</div>
+</div>
+
+<div class="slide" id="s3">
+  <h2>I've been a software engineer for 6 years.<br>I've been the confused junior too.</h2>
+  <div class="body-text">I wanted to understand why this gap is so hard to close &mdash; so I spent months in Reddit threads, Hacker News, interviews, and developer surveys studying what developers actually experience.</div>
+  <div class="notes">"Twice — once at my first job, and again when I switched domains. Both times it felt like starting over. I wanted to understand why."</div>
+</div>
+
+<div class="slide" id="s4">
+  <h2>AI makes this <span class="orange">more complicated</span>, not less</h2>
+  <div class="body-text">Anthropic's 2026 study: developers using AI scored <strong style="color:#e07070">17% lower</strong> on comprehension tests than those coding by hand.</div>
+  <div class="body-text" style="margin-top:0.6rem">But employers want faster onboarding and faster shipping. Direct conflict.</div>
+  <div class="source">Anthropic 2026, N&thinsp;=&thinsp;52, Cohen's d&thinsp;=&thinsp;0.74, p&thinsp;=&thinsp;0.01</div>
+  <div class="notes">"This is the real tension. Companies want speed. But when juniors rely on AI, they don't build the understanding they need. The skills don't form. And everyone knows it — developers themselves say 'the biggest challenge is keeping your brains from rotting.'"</div>
+</div>
+
+<div class="slide" id="s4b">
+  <img class="slide-img" src="efficiency-paradox.png" alt="The Efficiency Paradox: Faster Coding, Slower Shipping">
+  <div class="body-text" style="margin-top:1.2rem">Coding is faster. But verifying, reviewing, and understanding has become the constraint.</div>
+  <div class="notes">"75% say coding speed improved with AI. But look at review time — 43% say it worsened or stayed the same. Generating code is instant now. The bottleneck moved to the human part — understanding what the code does, reviewing it, taking responsibility for it."</div>
+</div>
+
+<div class="slide" id="s5">
+  <h2>But research also found <span class="green">what works</span></h2>
+  <div class="data-row">
+    <div class="data-num red">&minus;17%</div>
+    <div class="data-desc">Plain AI chatbot (just answers questions) &rarr; exam scores dropped</div>
+  </div>
+  <div class="data-row">
+    <div class="data-num green">+127%</div>
+    <div class="data-desc">Scaffolded AI (guides, hints, doesn't just answer) &rarr; practice gains, no exam loss</div>
+  </div>
+  <div class="data-row">
+    <div class="data-num accent">g&thinsp;=&thinsp;0.50</div>
+    <div class="data-desc">Retrieval practice (quizzing yourself) &mdash; one of the strongest effects in learning research</div>
+  </div>
+  <div class="source" style="margin-top:1.5rem">Bastani et al., PNAS 2025, N&thinsp;&asymp;&thinsp;1,000 &nbsp;|&nbsp; Rowland 2014 meta-analysis</div>
+  <div class="notes">"This is a 1,000-student randomized trial. Plain ChatGPT — just ask and get answers — made students worse on exams. But when the AI was designed to guide and scaffold — give hints, not answers — learning was preserved. And retrieval practice, quizzing yourself, is one of the most replicated findings in all of learning science."</div>
+</div>
+
+<div class="slide" id="s6">
+  <h2>People want <span class="accent">mastery</span>,<br>not to be AI operators.</h2>
+  <div class="body-text">Human understanding is still valued &mdash; by people themselves and by organizations. There's a bottleneck in code review, debugging, and taking responsibility that requires real comprehension.</div>
+  <div class="notes">"This came through clearly in the research. Developers at every level said the same thing in different words. Juniors want to feel like real engineers. Seniors want people on their team who can actually reason about the code. Nobody wants to just be an AI operator."</div>
+</div>
+
+<div class="slide" id="s7">
+  <h2>So I built a prototype grounded in this research.</h2>
+  <div class="body-text">Active learning, scaffolded AI, retrieval practice &mdash; applied to learning real code.</div>
+  <div class="notes">"Active learning from math circles and tutoring research. Scaffolded AI from the education studies. Retrieval practice from decades of cognitive science. Let me show you what this looks like."</div>
+</div>
+
+<div class="slide" id="s8">
+  <div class="demo-label">live demo</div>
+  <h2>codeprobe</h2>
+  <a href="./index.html" target="codeprobe" id="demo-link" style="color:#6aadff;font-size:clamp(1.05rem,1.7vw,1.3rem);margin-top:1.2rem;cursor:pointer;text-decoration:none">switch to the app &rarr;</a>
+  <div class="notes">Switch to prototype. Walk through: see code → seed questions → type a question → start → show the tutor quizzing back. ~2 min. The key moment: the tool challenges you, not just explains.</div>
+</div>
+
+<div class="slide" id="s9">
+  <div class="insight-pair">
+    <div class="finding">Asking for help has social costs &mdash; developers avoid it to not look incompetent</div>
+    <div class="arrow">&darr;</div>
+    <div class="decision">Make <span class="accent">learning</span> private and judgment-free</div>
+  </div>
+  <div class="notes">"The research showed that people avoid asking because it exposes what they don't know. So the learning space has to be private. No one's watching. You can ask anything."</div>
+</div>
+
+<div class="slide" id="s10">
+  <div class="insight-pair">
+    <div class="finding">Plain AI worsened learning &mdash; only scaffolded AI improved it</div>
+    <div class="arrow">&darr;</div>
+    <div class="decision">Answer your curiosity, then <span class="orange">quiz you back</span> &mdash; instead of overloading you with information</div>
+  </div>
+  <div class="notes">"This is straight from the research. If the AI just answers, you don't retain. If it guides you, addresses what you're curious about, and then asks you to think — that's where the learning happens."</div>
+</div>
+
+<div class="slide" id="s11">
+  <div class="insight-pair">
+    <div class="finding">46% of developers don't trust AI output &mdash; it's confidently wrong</div>
+    <div class="arrow">&darr;</div>
+    <div class="decision">The <span class="green">real code is always visible</span> &mdash; the source of truth, not the AI</div>
+  </div>
+  <div class="notes">"If almost half of developers don't trust what AI says, you can't build a learning tool where the AI is the only thing you see. The actual code has to be right there, always."</div>
+</div>
+
+<div class="slide" id="s12">
+  <h2>Where this could go</h2>
+  <div class="body-text">Organizations could craft lesson series around their own architecture &mdash; to teach new engineers their specific codebase and principles.</div>
+  <div class="body-text" style="margin-top:0.6rem">Active learning means you prove to yourself that you understand. That builds <span class="accent">skills</span> and <span class="accent">confidence</span> together.</div>
+  <div class="notes">"This started as a tool for students, but I ended up using it myself to learn Rust and refresh C++. The real potential is for organizations — imagine onboarding lessons built around your actual codebase, where new engineers don't just read docs but actually work through the code and prove they get it."</div>
+</div>
+
+<div class="slide" id="s13">
+  <h1>Even in the AI era, human mastery becomes <span class="accent">more</span> valuable.</h1>
+  <div class="body-text">And we can get there.</div>
+  <div class="notes">Let this land. Then: "I'd love to hear what you think."</div>
+</div>
+
+<div class="slide" id="s14">
+  <h1>codeprobe</h1>
+  <div class="body-text" style="margin-top:0.5rem">learn by being challenged, not by being told</div>
+  <div class="notes">Q&A / reactions.</div>
+</div>
+
+<div id="progress"></div>
+<div id="counter"></div>
+<div id="hint">&larr; &rarr; arrow keys to navigate</div>
+
+<script>
+const slides = document.querySelectorAll('.slide');
+let current = 0;
+
+function show(n) {
+  slides[current].classList.remove('active');
+  current = Math.max(0, Math.min(n, slides.length - 1));
+  slides[current].classList.add('active');
+  document.getElementById('progress').style.width =
+    ((current / (slides.length - 1)) * 100) + '%';
+  document.getElementById('counter').textContent =
+    (current + 1) + ' / ' + slides.length;
+  document.getElementById('hint').style.display = current > 0 ? 'none' : '';
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); show(current + 1); }
+  if (e.key === 'ArrowLeft')  { e.preventDefault(); show(current - 1); }
+  if (e.key === 'Home')       { e.preventDefault(); show(0); }
+  if (e.key === 'End')        { e.preventDefault(); show(slides.length - 1); }
+});
+
+document.addEventListener('click', e => {
+  if (e.target.closest('#demo-link')) return;
+  if (e.clientX > window.innerWidth / 2) show(current + 1);
+  else show(current - 1);
+});
+
+show(0);
+</script>
+</body>
+</html>
