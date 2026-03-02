@@ -167,6 +167,8 @@ def save_users(users):
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
+    protocol_version = "HTTP/1.1"
+
     def do_GET(self):
         if self.path == f"/dashboard/{DASHBOARD_SECRET}":
             dash_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dashboard.html")
@@ -174,6 +176,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 content = f.read()
             self.send_response(200)
             self.send_header("Content-Type", "text/html")
+            self.send_header("Content-Length", str(len(content)))
             self.end_headers()
             self.wfile.write(content)
 
@@ -436,24 +439,29 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
         else:
             self.send_response(404)
+            self.send_header("Content-Length", "0")
             self.end_headers()
 
     def _json_response(self, code, data):
+        body = json.dumps(data).encode()
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
         self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
-        self.wfile.write(json.dumps(data).encode())
+        self.wfile.write(body)
 
     def do_OPTIONS(self):
         self.send_response(200)
+        self.send_header("Content-Length", "0")
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type, X-UID, X-Token")
         self.end_headers()
 
     def log_message(self, fmt, *args):
-        if "/api/" in (args[0] if args else ""):
+        first = str(args[0]) if args else ""
+        if "/api/" in first:
             super().log_message(fmt, *args)
 
 
@@ -464,4 +472,7 @@ if __name__ == "__main__":
     print(f"Dashboard at http://localhost:{port}/dashboard/{DASHBOARD_SECRET}")
     print(f"Using model: {LLM_MODEL}")
     print(f"API: {LLM_API_URL}")
-    http.server.ThreadingHTTPServer(("", port), Handler).serve_forever()
+    server = http.server.ThreadingHTTPServer(("", port), Handler)
+    server.request_queue_size = 64
+    server.socket.listen(64)
+    server.serve_forever()

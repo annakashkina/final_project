@@ -382,7 +382,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             # log to user's JSONL file
 
 # Multi-threaded: handles many users at once
-http.server.ThreadingHTTPServer(("", 3000), Handler).serve_forever()`,
+server = http.server.ThreadingHTTPServer(("", 3000), Handler)
+server.request_queue_size = 64  # default is 5 — too low when browsers
+server.socket.listen(64)        # open many connections at once (JS lessons, CSS, etc.)
+server.serve_forever()`,
       },
     ],
     seedQuestions: [
