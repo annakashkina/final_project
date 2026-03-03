@@ -126,10 +126,10 @@ function setPhase(phase) {
 }
 
 // After each AI reply, check if the lesson should end.
-// The AI includes [LESSON_COMPLETE] only when the student
-// answered correctly — never right after a correction.
+// The AI ends its message with [LESSON_COMPLETE] only when
+// the student answered correctly — never right after a correction.
 
-if (reply.includes("[LESSON_COMPLETE]")) {
+if (reply.endsWith("[LESSON_COMPLETE]")) {
   saveCompletion(lesson.id);
   setPhase("done");
 }

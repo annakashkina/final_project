@@ -490,8 +490,8 @@ async function getLLMResponse() {
     const t = $("#typing"); if (t) t.remove();
     const clean = reply.trim().replace("[LESSON_PENDING]", "").trim();
 
-    if (clean.includes("[LESSON_COMPLETE]")) {
-      const summary = clean.replace("[LESSON_COMPLETE]", "").trim();
+    if (clean.trimEnd().endsWith("[LESSON_COMPLETE]")) {
+      const summary = clean.replace(/\[LESSON_COMPLETE\]\s*$/, "").trim();
       addMsg("assistant", summary);
       saveCompletion(state.lesson.id);
       track("tutor_reply", { lesson: state.lesson.id, text: summary });
