@@ -184,6 +184,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             if f"key={DASHBOARD_SECRET}" not in self.path:
                 self._json_response(403, {"error": "forbidden"})
                 return
+            qs = self.path.split("?", 1)[1] if "?" in self.path else ""
+            params = dict(p.split("=", 1) for p in qs.split("&") if "=" in p)
+            min_events = int(params.get("min_events", 0))
             ensure_data_dir()
             users = load_users()
             # Count events per user
@@ -202,6 +205,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                                     last_ts = evt["ts"]
                             except json.JSONDecodeError:
                                 pass
+                if count < min_events:
+                    continue
                 result.append({
                     "uid": uid,
                     "ua": meta.get("ua", ""),

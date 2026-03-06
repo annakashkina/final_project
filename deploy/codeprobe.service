@@ -1,0 +1,25 @@
+[Unit]
+Description=CodeProbe
+After=network.target
+
+[Service]
+Type=simple
+User=codeprobe
+WorkingDirectory=/opt/codeprobe
+ExecStart=/usr/bin/python3 serve.py 3000
+Restart=always
+RestartSec=3
+EnvironmentFile=/opt/codeprobe/.env
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/codeprobe/data
+
+# Memory limit (leave room for Caddy + OS on 512MB + 512MB swap)
+MemoryMax=300M
+
+[Install]
+WantedBy=multi-user.target
