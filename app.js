@@ -1,4 +1,4 @@
-import { lessons, series } from "./lessons.js?v=5";
+import { lessons, series } from "./lessons.js";
 
 // User ID for tracking
 function getUID() {
@@ -98,6 +98,73 @@ function shouldRevisit(id) {
   if (!p) return false;
   return (Date.now() - p.last) / 86400000 >= 1 && p.completed < 3;
 }
+
+// --- Session persistence ---
+// Saves in-progress lesson state to localStorage so refreshing or closing
+// the tab won't lose your conversation. Cleared when the lesson completes.
+function saveSession() {
+  if (!state.lesson || state.phase === "explore" || state.phase === "done") return;
+  localStorage.setItem("codeprobe_session", JSON.stringify({
+    lessonId: state.lesson.id,
+    phase: state.phase,
+    messages: state.messages,
+    exchangeCount: state.exchangeCount,
+    fileIdx: state.fileIdx,
+    chatHTML: $("#chat-messages")?.innerHTML || "",
+    savedAt: Date.now(),
+  }));
+}
+
+function loadSession() {
+  try {
+    const s = JSON.parse(localStorage.getItem("codeprobe_session"));
+    if (!s || Date.now() - s.savedAt > 86400000) {
+      localStorage.removeItem("codeprobe_session");
+      return null;
+    }
+    return s;
+  } catch { return null; }
+}
+
+function clearSession() {
+  localStorage.removeItem("codeprobe_session");
+}
+
+// --- URL routing ---
+// Hash-based: / = home, #lesson-id = lesson view.
+// Back/forward buttons work. URLs are shareable.
+function navigate(lessonId) {
+  if (lessonId) {
+    window.location.hash = lessonId;
+  } else {
+    // Clean URL when going home (no trailing #)
+    if (window.location.hash) {
+      history.pushState(null, "", window.location.pathname);
+    }
+    handleRoute();
+  }
+}
+
+let _routing = false;
+async function handleRoute() {
+  if (_routing) return;
+  _routing = true;
+  try {
+    const id = window.location.hash.slice(1);
+    if (id) {
+      await openLesson(id);
+    } else {
+      state.lesson = null;
+      renderHome();
+      showView("home");
+    }
+  } finally {
+    _routing = false;
+  }
+}
+
+window.addEventListener("hashchange", handleRoute);
+window.addEventListener("popstate", handleRoute);
 
 // "I already know" chips
 const LANG_CHIPS = ["Python", "JavaScript", "Java", "C", "C++", "TypeScript", "Ruby", "Rust", "Go", "C#"];
@@ -272,7 +339,7 @@ function renderHome() {
     }).join("");
 
   $$("#lesson-grid .card").forEach(c =>
-    c.addEventListener("click", () => openLesson(c.dataset.id))
+    c.addEventListener("click", () => navigate(c.dataset.id))
   );
 }
 
@@ -344,9 +411,9 @@ function renderSeeds() {
 }
 
 // Phases
-function setPhase(phase) {
+function setPhase(phase, { silent = false } = {}) {
   state.phase = phase;
-  if (state.lesson) track("phase_change", { lesson: state.lesson.id, phase });
+  if (state.lesson && !silent) track("phase_change", { lesson: state.lesson.id, phase });
   const order = ["explore", "learn", "challenge", "done"];
   const idx = order.indexOf(phase);
   $$(".phase").forEach((el, i) => {
@@ -357,9 +424,10 @@ function setPhase(phase) {
   if (phase === "explore") $("#phase-explore").classList.remove("hidden");
   else if (phase === "learn" || phase === "challenge") {
     $("#phase-chat").classList.remove("hidden");
-    if (phase === "challenge") addMsg("challenge", "final challenge");
+    if (phase === "challenge" && !silent) addMsg("challenge", "final challenge");
   }
   else if (phase === "done") $("#phase-complete").classList.remove("hidden");
+  if (!silent) saveSession();
 }
 
 function updateExchange() {
@@ -421,6 +489,7 @@ function fmt(t) {
 
 // Completion
 function renderDone(summary) {
+  clearSession();
   const lesson = state.lesson;
   const p = getProgress()[lesson.id];
   const first = p && p.completed === 1;
@@ -435,7 +504,7 @@ function renderDone(summary) {
       <button class="btn-secondary" id="go-retry">try again</button>
     </div>`;
 
-  $("#go-home").addEventListener("click", () => { renderHome(); showView("home"); });
+  $("#go-home").addEventListener("click", () => navigate(null));
   $("#go-retry").addEventListener("click", () => openLesson(lesson.id));
 
   // confetti
@@ -454,17 +523,38 @@ function renderDone(summary) {
 }
 
 // Actions
-function openLesson(id) {
-  state.lesson = lessons.find(l => l.id === id);
-  state.messages = [];
-  state.exchangeCount = 0;
-  state.fileIdx = 0;
-  renderCode();
-  renderSeeds();
-  $("#user-questions").value = "";
-  $("#chat-messages").innerHTML = "";
-  setPhase("explore");
+async function openLesson(id) {
   showView("lesson");
+
+  const lesson = lessons.find(l => l.id === id);
+  if (!lesson) { navigate(null); return; }
+
+  state.lesson = lesson;
+
+  // Check for saved session
+  const session = loadSession();
+  if (session && session.lessonId === id && session.phase !== "explore" && session.phase !== "done") {
+    // Restore in-progress session
+    state.messages = session.messages || [];
+    state.exchangeCount = session.exchangeCount || 0;
+    state.fileIdx = session.fileIdx || 0;
+
+    renderCode();
+    setPhase(session.phase, { silent: true });
+    $("#chat-messages").innerHTML = session.chatHTML || "";
+    updateExchange();
+  } else {
+    // Fresh start
+    state.messages = [];
+    state.exchangeCount = 0;
+    state.fileIdx = 0;
+    renderCode();
+    renderSeeds();
+    $("#user-questions").value = "";
+    $("#chat-messages").innerHTML = "";
+    setPhase("explore");
+  }
+
   track("lesson_open", { lesson: id });
 }
 
@@ -476,6 +566,7 @@ async function startLearning() {
   const est = state.mode === "quick" ? "~1 exchange" : "~3 exchanges ahead";
   addMsg("system", q ? `questions sent. ${est}.` : `starting. ${est}.`);
   track("start_learning", { lesson: state.lesson.id, questions: q, mode: state.mode, lang: state.lang });
+  saveSession();
   await getLLMResponse();
 }
 
@@ -502,6 +593,7 @@ async function getLLMResponse() {
       addMsg("assistant", clean);
       track("tutor_reply", { lesson: state.lesson.id, text: clean });
       if (state.mode !== "quick" && state.exchangeCount >= 4 && state.phase !== "challenge") setPhase("challenge");
+      saveSession();
     }
     updateExchange();
   } catch (e) {
@@ -524,6 +616,7 @@ async function sendMsg() {
   addMsg("user", text);
   updateExchange();
   track("user_msg", { lesson: state.lesson.id, text });
+  saveSession();
   await getLLMResponse();
 }
 
@@ -547,7 +640,8 @@ function toast(msg) {
 // Events
 $("#back-btn").addEventListener("click", () => {
   track("back_home", { from_lesson: state.lesson?.id });
-  renderHome(); showView("home");
+  clearSession();
+  navigate(null);
 });
 $("#start-btn").addEventListener("click", startLearning);
 $$("#mode-toggle .mode-opt").forEach(btn => {
@@ -671,7 +765,7 @@ $("#feedback-modal").addEventListener("click", (e) => {
   if (e.target === $("#feedback-modal")) $("#feedback-modal").classList.add("hidden");
 });
 
-// Init
+// Init — route based on URL instead of always showing home
 renderChips();
-renderHome();
+handleRoute();
 identify();

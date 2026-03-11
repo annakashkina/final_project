@@ -8,7 +8,7 @@ export const metaLessons = { name: "How codeprobe works", lessons: [
       "Every lesson is a JavaScript object — with code, concepts, and personalized hints. This is how the content you're reading right now is defined.",
     concepts: [
       "Lessons as data: id, code, concepts, bridges, seed questions",
-      "How the app loads and renders a lesson",
+      "Series group lessons by language (C, Rust, Python, etc.)",
       "Bridges: personalized explanations matched to your background",
       "Seed questions as conversation starters",
     ],
@@ -59,11 +59,17 @@ export const cLessons = { name: "C", lessons: [
       },
       {
         name: "app.js",
-        code: `// When you click a lesson card on the home screen:
+        code: `import { lessons, series } from "./lessons.js";
 
+// lessons.js imports every series file and re-exports two things:
+//   series  — array of { name, lessons } (for the home grid)
+//   lessons — flat array of all lesson objects (for lookup by id)
+
+// When you click a lesson card on the home screen:
 function openLesson(id) {
-  state.lesson = lessons.find(l => l.id === id);
-  state.messages = [];    // start a fresh conversation
+  const lesson = lessons.find(l => l.id === id);
+  if (!lesson) { navigate(null); return; }
+  state.lesson = lesson;
   renderCode();           // syntax-highlight the left panel
   renderSeeds();          // show clickable seed questions
   setPhase("explore");    // phase 1: read the code
@@ -90,6 +96,7 @@ function openLesson(id) {
       "State object tracks the current lesson, messages, and phase",
       "[LESSON_COMPLETE] — the AI decides when you're ready",
       "Quick mode (~1 exchange) vs full mode (~5-7 exchanges)",
+      "setPhase({ silent }) — silent mode for session restore without side effects",
     ],
     bridges: {
       Python: "Like a state machine — a variable tracks the current phase, functions transition between them.",
@@ -102,7 +109,7 @@ function openLesson(id) {
         code: `// All lesson state lives in one object
 
 const state = {
-  lesson: null,        // current lesson object from lessons.js
+  lesson: null,        // current lesson object (loaded on demand)
   fileIdx: 0,          // which file tab is selected (multi-file lessons)
   phase: "explore",    // "explore" | "learn" | "challenge" | "done"
   messages: [],        // [{role: "system"|"user"|"assistant", content}]
@@ -117,12 +124,21 @@ const state = {
 // CHALLENGE: final synthesis question (full mode only)
 // DONE:      summary, concepts learned, confetti
 
-function setPhase(phase) {
+// { silent } prevents side effects during session restore:
+// no tracking events, no "final challenge" label, no saveSession()
+function setPhase(phase, { silent = false } = {}) {
   state.phase = phase;
+  if (state.lesson && !silent) track("phase_change", {...});
+
   // Each phase has its own UI panel — show the right one
   if (phase === "explore") show("#phase-explore");
-  else if (phase === "learn" || phase === "challenge") show("#phase-chat");
+  else if (phase === "learn" || phase === "challenge") {
+    show("#phase-chat");
+    if (phase === "challenge" && !silent) addMsg("challenge", "final challenge");
+  }
   else if (phase === "done") show("#phase-complete");
+
+  if (!silent) saveSession();  // persist to localStorage
 }
 
 // After each AI reply, check if the lesson should end.
@@ -132,6 +148,7 @@ function setPhase(phase) {
 if (reply.endsWith("[LESSON_COMPLETE]")) {
   saveCompletion(lesson.id);
   setPhase("done");
+  renderDone(summary);
 }
 
 // In full mode, after 4+ exchanges, switch to the final challenge
@@ -142,8 +159,188 @@ if (state.mode !== "quick" && state.exchangeCount >= 4)
     seedQuestions: [
       "Why does the AI decide when the lesson ends, not the student?",
       "What's the difference between the 'learn' and 'challenge' phases?",
-      "Why is the rule 'never end with [LESSON_COMPLETE] after a correction' important?",
+      "Why does setPhase need a 'silent' option?",
       "How does quick mode skip the challenge phase entirely?",
+    ],
+  },
+
+  {
+    id: "meta-routing",
+    title: "URL Routing & Navigation",
+    difficulty: "Project",
+    icon: "🔗",
+    description:
+      "Hash-based routing gives every lesson a shareable URL, and makes the browser's back/forward buttons work. No server changes needed — the hash never hits the server.",
+    concepts: [
+      "Hash-based routing: #lesson-id in the URL",
+      "hashchange and popstate events for browser navigation",
+      "navigate() as the single entry point for all navigation",
+      "Re-entry guard (_routing) prevents double-handling",
+      "history.pushState for clean home URL (no trailing #)",
+    ],
+    bridges: {
+      Python: "Like Flask's @app.route — mapping URL patterns to handler functions, but entirely client-side.",
+      Java: "Like a servlet's URL mapping — the hash fragment acts as the route, handled in JavaScript.",
+      Ruby: "Like Sinatra's get '/path' — but running in the browser, not a server.",
+    },
+    files: [
+      {
+        name: "app.js",
+        code: `// Hash-based routing: / = home, #lesson-id = lesson view.
+// The hash fragment (#...) is never sent to the server,
+// so this works with any static file server — no rewrites needed.
+
+function navigate(lessonId) {
+  if (lessonId) {
+    window.location.hash = lessonId;  // triggers hashchange
+  } else {
+    // Clean URL when going home (remove trailing #)
+    if (window.location.hash) {
+      history.pushState(null, "", window.location.pathname);
+    }
+    handleRoute();
+  }
+}
+
+// Guard against re-entry: hashchange can fire during openLesson
+let _routing = false;
+
+async function handleRoute() {
+  if (_routing) return;       // prevent double-handling
+  _routing = true;
+  try {
+    const id = window.location.hash.slice(1);  // "#c-pointers" → "c-pointers"
+    if (id) {
+      await openLesson(id);   // async — loads lesson data on demand
+    } else {
+      state.lesson = null;
+      renderHome();
+      showView("home");
+    }
+  } finally {
+    _routing = false;
+  }
+}
+
+// Browser back/forward buttons trigger these events
+window.addEventListener("hashchange", handleRoute);
+window.addEventListener("popstate", handleRoute);
+
+// Card clicks go through navigate(), not direct function calls
+card.addEventListener("click", () => navigate(card.dataset.id));
+
+// Back button and "another lesson" go through navigate(null)
+$("#back-btn").addEventListener("click", () => navigate(null));
+$("#go-home").addEventListener("click", () => navigate(null));
+
+// Init: route based on current URL (supports direct links)
+handleRoute();  // if URL is /#c-pointers, opens that lesson directly`,
+      },
+    ],
+    seedQuestions: [
+      "Why use hash-based routing instead of regular URL paths?",
+      "What would break if you removed the _routing guard?",
+      "How does someone share a link to a specific lesson?",
+      "Why use history.pushState when going home instead of just setting hash to ''?",
+    ],
+  },
+
+  {
+    id: "meta-session",
+    title: "Session Persistence",
+    difficulty: "Project",
+    icon: "💾",
+    description:
+      "Accidentally close the tab mid-lesson? Your conversation survives. The app saves chat state to localStorage after every message and restores it when you return — with a 24-hour expiry.",
+    concepts: [
+      "localStorage for session state (survives tab close)",
+      "Saving after every meaningful state change",
+      "24-hour expiry to prevent stale sessions",
+      "Silent restore: setPhase({ silent: true }) avoids duplicate side effects",
+      "clearSession() on lesson completion or manual back",
+    ],
+    bridges: {
+      Python: "Like pickling state to a file — JSON.stringify serializes, JSON.parse deserializes.",
+      Java: "Like SharedPreferences or Serializable — structured data persisted to browser storage.",
+      Ruby: "Like Marshal.dump/load — save and restore a hash of state to survive restarts.",
+    },
+    files: [
+      {
+        name: "app.js",
+        code: `// Saves in-progress lesson state to localStorage.
+// Cleared when the lesson completes or user clicks back.
+
+function saveSession() {
+  // Only save during active learning (not explore or done)
+  if (!state.lesson || state.phase === "explore" || state.phase === "done") return;
+
+  localStorage.setItem("codeprobe_session", JSON.stringify({
+    lessonId: state.lesson.id,
+    phase: state.phase,
+    messages: state.messages,         // full conversation array
+    exchangeCount: state.exchangeCount,
+    fileIdx: state.fileIdx,
+    chatHTML: $("#chat-messages")?.innerHTML || "",  // rendered messages
+    savedAt: Date.now(),              // for 24h expiry check
+  }));
+}
+
+function loadSession() {
+  try {
+    const s = JSON.parse(localStorage.getItem("codeprobe_session"));
+    // Expired after 24 hours — stale sessions are confusing
+    if (!s || Date.now() - s.savedAt > 86400000) {
+      localStorage.removeItem("codeprobe_session");
+      return null;
+    }
+    return s;
+  } catch { return null; }
+}
+
+function clearSession() {
+  localStorage.removeItem("codeprobe_session");
+}
+
+// --- Where saveSession() is called ---
+// setPhase()       — after every phase transition
+// startLearning()  — when the first system message is built
+// sendMsg()        — after every user message
+// getLLMResponse()  — after every AI reply (except lesson complete)
+
+// --- Where clearSession() is called ---
+// renderDone()     — lesson finished, no need to restore
+// back button      — user deliberately left the lesson
+
+// --- Restore logic in openLesson ---
+function openLesson(id) {
+  const lesson = lessons.find(l => l.id === id);
+  state.lesson = lesson;
+
+  const session = loadSession();
+  if (session && session.lessonId === id
+      && session.phase !== "explore" && session.phase !== "done") {
+    // Restore: put state back, re-render from saved HTML
+    state.messages = session.messages;
+    state.exchangeCount = session.exchangeCount;
+    state.fileIdx = session.fileIdx;
+    renderCode();
+    setPhase(session.phase, { silent: true });  // no side effects
+    $("#chat-messages").innerHTML = session.chatHTML;
+    updateExchange();
+  } else {
+    // Fresh start
+    state.messages = [];
+    state.exchangeCount = 0;
+    setPhase("explore");
+  }
+}`,
+      },
+    ],
+    seedQuestions: [
+      "Why save to localStorage instead of sessionStorage?",
+      "Why expire sessions after 24 hours?",
+      "What would go wrong if setPhase didn't have a silent option during restore?",
+      "Why save the rendered chatHTML instead of just re-rendering from messages?",
     ],
   },
 
@@ -183,6 +380,11 @@ function buildPrompt(lesson, questions) {
     .map(([lang, note]) => \`- \${lang}: \${note}\`)
     .join("\\n");
 
+  // Multi-file lessons: concatenate all files into the prompt
+  const code = lesson.files
+    ? lesson.files.map(f => \`--- \${f.name} ---\\n\${f.code}\`).join("\\n\\n")
+    : lesson.code;
+
   // Also factors in concept knowledge (OOP, concurrency, etc.)
   // to tell the AI what NOT to assume the student knows
   const concepts = getKnownConcepts();
@@ -207,7 +409,7 @@ BRIDGES:
 \${bridges}
 
 CODE:
-\${lesson.code}
+\${code}
 
 CONCEPTS: \${lesson.concepts.join(", ")}
 
@@ -235,6 +437,7 @@ STUDENT QUESTIONS: \${questions || "(none)"}\`;
       "The full array is sent every time — the server is stateless",
       "fetch() is the browser's built-in HTTP client",
       "The server keeps the API key safe from the browser",
+      "Retry with backoff: up to 3 attempts on server errors",
     ],
     bridges: {
       Python: "fetch() is like requests.post() — the browser's built-in HTTP client.",
@@ -255,20 +458,29 @@ state.messages = [
 // Step 2: send to server → AI teaches and quizzes
 const reply = await chat(state.messages);
 state.messages.push({ role: "assistant", content: reply });
+saveSession();  // persist after every AI reply
 
 // Step 3: student answers → add to array, send again
 state.messages.push({ role: "user", content: answer });
+saveSession();  // persist after every user message
 const reply2 = await chat(state.messages);  // full history
 state.messages.push({ role: "assistant", content: reply2 });
 
-// The HTTP call to our Python server
+// The HTTP call with retry logic
 async function chat(messages) {
-  const resp = await fetch("/api/chat", {
-    method: "POST",
-    headers: await apiHeaders(),    // includes X-UID, X-Token
-    body: JSON.stringify({ messages }),
-  });
-  return (await resp.json()).reply;
+  const h = await apiHeaders();  // includes X-UID, X-Token
+  const body = JSON.stringify({ messages });
+  let lastErr;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const r = await fetch("/api/chat", { method: "POST", headers: h, body });
+      if (r.ok) return (await r.json()).reply;
+      lastErr = (await r.json().catch(() => ({}))).error || \`Error \${r.status}\`;
+      if (r.status < 500) break;  // don't retry client errors
+    } catch (e) { lastErr = e.message; }
+    await new Promise(ok => setTimeout(ok, 1000 * (attempt + 1)));  // backoff
+  }
+  throw new Error(lastErr);
 }`,
       },
       {
@@ -309,7 +521,7 @@ self._json_response(200, {"reply": reply})
       "Why send the WHOLE message array each time, not just the latest message?",
       "Why does the browser talk to our server instead of calling the LLM directly?",
       "What does the 'system' role do that 'user' doesn't?",
-      "Why log every exchange to a file?",
+      "Why retry on 5xx errors but not on 4xx?",
     ],
   },
 

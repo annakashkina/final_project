@@ -487,6 +487,75 @@ fn main() {
     ],
   },
 
+  {
+    id: "rust-concurrency",
+    title: "Concurrency & Parallelism",
+    difficulty: "Advanced",
+    icon: "⚡",
+    description:
+      "Fearless concurrency: Rust's ownership system prevents data races at compile time. Threads, channels, Arc, Mutex — and the compiler catches the bugs before you run.",
+    concepts: [
+      "std::thread::spawn and JoinHandle",
+      "Channels (mpsc) for message passing between threads",
+      "Arc<Mutex<T>> for shared mutable state",
+      "Send and Sync traits — the compiler enforces thread safety",
+      "move closures to transfer ownership into threads",
+    ],
+    bridges: {
+      "C++":
+        "Like std::thread + std::mutex + std::shared_ptr, but the compiler rejects data races instead of leaving them as runtime bugs.",
+      Python:
+        "Python has threading but the GIL limits parallelism. Rust threads run truly in parallel with no GIL — and the compiler prevents data races.",
+      Java: "Like Thread + synchronized + AtomicReference, but enforced at compile time. No NullPointerException, no silent race conditions.",
+    },
+    code: `use std::sync::{Arc, Mutex, mpsc};
+use std::thread;
+
+fn main() {
+    // --- Threads: move ownership in ---
+    let data = vec![1, 2, 3];
+    let handle = thread::spawn(move || data.iter().sum::<i32>());
+    // println!("{data:?}"); // COMPILE ERROR: moved into thread
+    println!("Sum: {}", handle.join().unwrap());
+
+    // --- Channels: message passing (mpsc = multi-producer, single-consumer) ---
+    let (tx, rx) = mpsc::channel();
+    let tx2 = tx.clone();
+
+    thread::spawn(move || { tx.send("from thread 1").unwrap(); });
+    thread::spawn(move || { tx2.send("from thread 2").unwrap(); });
+
+    for msg in rx {  // blocks until all senders drop
+        println!("Got: {msg}");
+    }
+
+    // --- Shared state: Arc<Mutex<T>> ---
+    let counter = Arc::new(Mutex::new(0));
+    let mut handles = vec![];
+
+    for _ in 0..5 {
+        let counter = Arc::clone(&counter);
+        handles.push(thread::spawn(move || {
+            *counter.lock().unwrap() += 1;
+            // lock released here (RAII) — no manual unlock
+        }));
+    }
+    for h in handles { h.join().unwrap(); }
+    println!("Final: {}", *counter.lock().unwrap());
+
+    // --- The compiler catches these before you run ---
+    // thread::spawn(|| println!("{data:?}"));   // ERROR: may outlive data (need move)
+    // let rc = std::rc::Rc::new(5);
+    // thread::spawn(move || println!("{rc}"));   // ERROR: Rc is not Send (use Arc)
+}`,
+    seedQuestions: [
+      "Why does the compiler reject `thread::spawn(|| println!(\"{v:?}\"))` without `move`?",
+      "What's the difference between Arc and Rc — why can't Rc cross thread boundaries?",
+      "What happens if a thread panics while holding a Mutex lock?",
+      "Why use channels (mpsc) instead of Arc<Mutex<T>> — when is each better?",
+    ],
+  },
+
   // ===== CODEBASE LESSONS: minigrep =====
   {
     id: "minigrep-overview",
