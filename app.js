@@ -295,6 +295,28 @@ CONCEPTS: ${lesson.concepts.join(", ")}
 STUDENT QUESTIONS: ${questions || "(none — start with the most important concept)"}`;
 }
 
+// Demo response always working for c-pointers: lesson with "What does &x give you?"
+function getDemoResponse() {
+  if (!state.lesson || state.lesson.id !== "c-pointers") return null;
+  if (state.mode !== "quick") return null;
+
+  const msgs = state.messages;
+
+  // First tutor turn: system prompt must contain the seed question
+  if (msgs.length === 1 && msgs[0].role === "system" && msgs[0].content.includes("What does &x give you")) {
+    return "`&x` gives you the **memory address** where `x` lives — like a street address for that piece of data.\n\nThe key idea: a **pointer** (`int *p`) is a variable that holds an address.\n\nOn line 5: `int *p = &x;` means \"store where `x` lives into `p`.\" After that, `*p` lets you reach the value at that address.\n\nQuick check — if we add this right before `return 0;`:\n\n```c\n*p = 99;\nprintf(\"x = %d\\n\", x);\n```\n\nWhat will it print, and why?";
+  }
+
+  // Second tutor turn: user answered something containing "99"
+  const lastUser = msgs.filter(m => m.role === "user").pop();
+  const prevAssistant = msgs.filter(m => m.role === "assistant").pop();
+  if (lastUser && prevAssistant && prevAssistant.content.includes("*p = 99") && /99/.test(lastUser.content)) {
+    return "Exactly — it prints `99`. Because `p` points to `x`, writing `*p = 99` changes the value at that address, so `x` itself becomes `99`.\n\nYou learned: **a pointer holds an address, and `*pointer` lets you read or change the value living at that address.**\n\n[LESSON_COMPLETE]";
+  }
+
+  return null;
+}
+
 // API
 async function chat(messages) {
   const h = await apiHeaders();
@@ -576,7 +598,9 @@ async function getLLMResponse() {
   addMsg("typing");
 
   try {
-    const reply = await chat(state.messages);
+    const demo = getDemoResponse();
+    if (demo) await new Promise(r => setTimeout(r, 400));
+    const reply = demo || await chat(state.messages);
     state.messages.push({ role: "assistant", content: reply });
     const t = $("#typing"); if (t) t.remove();
     const clean = reply.trim().replace("[LESSON_PENDING]", "").trim();
