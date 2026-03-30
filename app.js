@@ -1,13 +1,24 @@
 import { lessons, series } from "./lessons.js";
 
-// User ID for tracking
+// --- Privacy mode: ephemeral (default) / saving / paused ---
+function getPrivacyMode() {
+  const v = localStorage.getItem("codeprobe_privacy");
+  if (v === "saving" || v === "paused") return v;
+  return "ephemeral";
+}
+
+function isSaving() { return getPrivacyMode() === "saving"; }
+
+// --- User ID ---
+// Ephemeral: session-only UID in memory (never stored, new each page load)
+// Saving/paused: persistent UID in localStorage
+let _sessionUID = null;
+
 function getUID() {
-  let uid = localStorage.getItem("codeprobe_uid");
-  if (!uid) {
-    uid = crypto.randomUUID();
-    localStorage.setItem("codeprobe_uid", uid);
-  }
-  return uid;
+  const stored = localStorage.getItem("codeprobe_uid");
+  if (stored) return stored;
+  if (!_sessionUID) _sessionUID = crypto.randomUUID();
+  return _sessionUID;
 }
 
 // JS proof token — sha256(uid + salt), first 8 hex chars
@@ -24,34 +35,27 @@ function apiHeaders() {
     "Content-Type": "application/json",
     "X-UID": getUID(),
     "X-Token": token,
+    "X-Mode": isSaving() ? "saving" : "private",
   }));
 }
 
-// Analytics — fire-and-forget
+// Analytics — fire-and-forget, only when saving
 function track(type, data = {}) {
+  if (!isSaving()) return;
   const body = JSON.stringify({ type, ...data, ts: Date.now() });
   apiHeaders().then(h => fetch("/api/event", { method: "POST", headers: h, body })).catch(() => {});
 }
 
-// Identify: send page_load, adopt server-matched UID + restore progress
+// Identify: send page_load (only when saving, no more IP/UA matching)
 async function identify() {
-  const uid = getUID();
+  if (!isSaving()) return;
   try {
     const h = await apiHeaders();
-    const r = await fetch("/api/event", {
+    await fetch("/api/event", {
       method: "POST",
       headers: h,
       body: JSON.stringify({ type: "page_load", ts: Date.now() }),
     });
-    const data = await r.json();
-    if (data.uid && data.uid !== uid) {
-      localStorage.setItem("codeprobe_uid", data.uid);
-      _tokenPromise = makeToken(data.uid);
-      if (data.progress) {
-        localStorage.setItem("codeprobe", JSON.stringify(data.progress));
-        renderHome();
-      }
-    }
   } catch {}
 }
 
@@ -79,13 +83,15 @@ const state = {
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => document.querySelectorAll(s);
 
-// Progress (localStorage)
+// Progress (localStorage — only when saving or paused)
 function getProgress() {
+  if (getPrivacyMode() === "ephemeral") return {};
   try { return JSON.parse(localStorage.getItem("codeprobe") || "{}"); }
   catch { return {}; }
 }
 
 function saveCompletion(id) {
+  if (getPrivacyMode() === "ephemeral") return;
   const p = getProgress();
   if (!p[id]) p[id] = { completed: 0, first: Date.now() };
   p[id].completed++;
@@ -99,10 +105,9 @@ function shouldRevisit(id) {
   return (Date.now() - p.last) / 86400000 >= 1 && p.completed < 3;
 }
 
-// --- Session persistence ---
-// Saves in-progress lesson state to localStorage so refreshing or closing
-// the tab won't lose your conversation. Cleared when the lesson completes.
+// --- Session persistence (only when saving or paused) ---
 function saveSession() {
+  if (getPrivacyMode() === "ephemeral") return;
   if (!state.lesson || state.phase === "explore" || state.phase === "done") return;
   localStorage.setItem("codeprobe_session", JSON.stringify({
     lessonId: state.lesson.id,
@@ -116,6 +121,7 @@ function saveSession() {
 }
 
 function loadSession() {
+  if (getPrivacyMode() === "ephemeral") return null;
   try {
     const s = JSON.parse(localStorage.getItem("codeprobe_session"));
     if (!s || Date.now() - s.savedAt > 86400000) {
@@ -516,6 +522,10 @@ function renderDone(summary) {
   const p = getProgress()[lesson.id];
   const first = p && p.completed === 1;
 
+  const saveHint = getPrivacyMode() === "ephemeral"
+    ? `<div class="save-hint">toggle <em>save my progress</em> on the home page to track completions</div>`
+    : "";
+
   $("#completion-card").innerHTML = `
     <h2>you understand this now.</h2>
     <div class="concepts">${lesson.concepts.map(c => `<span class="tag">${c}</span>`).join("")}</div>
@@ -524,7 +534,8 @@ function renderDone(summary) {
     <div class="comp-actions">
       <button class="btn-primary" id="go-home">another lesson</button>
       <button class="btn-secondary" id="go-retry">try again</button>
-    </div>`;
+    </div>
+    ${saveHint}`;
 
   $("#go-home").addEventListener("click", () => navigate(null));
   $("#go-retry").addEventListener("click", () => openLesson(lesson.id));
@@ -772,7 +783,12 @@ function openFeedback() {
   $("#feedback-send").addEventListener("click", () => {
     const text = $("#feedback-text").value.trim();
     if (!text) return;
-    track("feedback", { text, lesson: state.lesson?.id || null });
+    const fbData = { text, lesson: state.lesson?.id || null };
+    apiHeaders().then(h => fetch("/api/feedback", {
+      method: "POST", headers: h,
+      body: JSON.stringify(fbData),
+    })).catch(() => {});
+    track("feedback", fbData);  // also log in user timeline when saving
     inner.style.transition = "all 0.25s ease";
     inner.innerHTML = `
       <div style="text-align:center;padding:24px 16px">
@@ -789,7 +805,96 @@ $("#feedback-modal").addEventListener("click", (e) => {
   if (e.target === $("#feedback-modal")) $("#feedback-modal").classList.add("hidden");
 });
 
+// --- Save my progress toggle ---
+function enableSaving() {
+  const uid = getUID(); // promotes session UID to persistent
+  localStorage.setItem("codeprobe_uid", uid);
+  localStorage.setItem("codeprobe_privacy", "saving");
+  _tokenPromise = makeToken(uid);
+  identify();
+  renderSaveToggle();
+  renderHome();
+}
+
+function pauseSaving() {
+  localStorage.setItem("codeprobe_privacy", "paused");
+  renderSaveToggle();
+}
+
+function resumeSaving() {
+  localStorage.setItem("codeprobe_privacy", "saving");
+  _tokenPromise = makeToken(getUID());
+  identify();
+  renderSaveToggle();
+}
+
+function toggleSaving(on) {
+  const mode = getPrivacyMode();
+  if (on) {
+    if (mode === "ephemeral") enableSaving();
+    else resumeSaving();
+  } else {
+    pauseSaving();
+  }
+}
+
+async function exportData() {
+  try {
+    const h = await apiHeaders();
+    const r = await fetch("/api/export", { headers: h });
+    const data = await r.json();
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "codeprobe-data.json";
+    a.click();
+    URL.revokeObjectURL(url);
+    toast("data exported");
+  } catch { toast("export failed"); }
+}
+
+async function deleteEverything() {
+  try {
+    const h = await apiHeaders();
+    await fetch("/api/delete", { method: "POST", headers: h });
+  } catch {}
+  localStorage.removeItem("codeprobe_uid");
+  localStorage.removeItem("codeprobe_privacy");
+  localStorage.removeItem("codeprobe");
+  localStorage.removeItem("codeprobe_session");
+  _sessionUID = crypto.randomUUID();
+  _tokenPromise = makeToken(_sessionUID);
+  renderSaveToggle();
+  renderHome();
+  toast("all data deleted");
+}
+
+function renderSaveToggle() {
+  const mode = getPrivacyMode();
+  const check = $("#save-check");
+  const info = $("#save-info");
+  if (!check || !info) return;
+  check.checked = mode === "saving";
+  if (mode === "ephemeral") {
+    info.classList.add("hidden");
+  } else {
+    info.classList.remove("hidden");
+    $("#save-status").textContent = mode === "saving"
+      ? "saving your learning record"
+      : "paused \u2014 not recording new activity";
+  }
+}
+
+$("#save-check")?.addEventListener("change", (e) => toggleSaving(e.target.checked));
+$("#export-btn")?.addEventListener("click", exportData);
+$("#delete-btn")?.addEventListener("click", () => {
+  const msg = "Delete all your data from the server? Your progress, completions, and conversations will be lost permanently.";
+  if (confirm(msg)) deleteEverything();
+});
+
 // Init — route based on URL instead of always showing home
 renderChips();
+renderSaveToggle();
 handleRoute();
 identify();

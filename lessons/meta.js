@@ -251,8 +251,9 @@ handleRoute();  // if URL is /#c-pointers, opens that lesson directly`,
     difficulty: "Project",
     icon: "💾",
     description:
-      "Accidentally close the tab mid-lesson? Your conversation survives. The app saves chat state to localStorage after every message and restores it when you return — with a 24-hour expiry.",
+      "Accidentally close the tab mid-lesson? If you've enabled 'save my progress', your conversation survives. The app saves chat state to localStorage after every message and restores it when you return — with a 24-hour expiry. In ephemeral mode, nothing is saved.",
     concepts: [
+      "Privacy-aware: only persists when saving is enabled",
       "localStorage for session state (survives tab close)",
       "Saving after every meaningful state change",
       "24-hour expiry to prevent stale sessions",
@@ -269,9 +270,10 @@ handleRoute();  // if URL is /#c-pointers, opens that lesson directly`,
         name: "app.js",
         code: `// Saves in-progress lesson state to localStorage.
 // Cleared when the lesson completes or user clicks back.
+// Only works when the student has enabled "save my progress".
 
 function saveSession() {
-  // Only save during active learning (not explore or done)
+  if (getPrivacyMode() === "ephemeral") return;  // nothing stored
   if (!state.lesson || state.phase === "explore" || state.phase === "done") return;
 
   localStorage.setItem("codeprobe_session", JSON.stringify({
@@ -286,6 +288,7 @@ function saveSession() {
 }
 
 function loadSession() {
+  if (getPrivacyMode() === "ephemeral") return null;
   try {
     const s = JSON.parse(localStorage.getItem("codeprobe_session"));
     // Expired after 24 hours — stale sessions are confusing
@@ -436,6 +439,7 @@ STUDENT QUESTIONS: \${questions || "(none)"}\`;
       "Conversations as arrays of {role, content} messages",
       "The full array is sent every time — the server is stateless",
       "fetch() is the browser's built-in HTTP client",
+      "X-Mode header: the server only logs when the student opted in",
       "The server keeps the API key safe from the browser",
       "Retry with backoff: up to 3 attempts on server errors",
     ],
@@ -468,7 +472,7 @@ state.messages.push({ role: "assistant", content: reply2 });
 
 // The HTTP call with retry logic
 async function chat(messages) {
-  const h = await apiHeaders();  // includes X-UID, X-Token
+  const h = await apiHeaders();  // includes X-UID, X-Token, X-Mode
   const body = JSON.stringify({ messages });
   let lastErr;
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -492,6 +496,10 @@ async function chat(messages) {
 #   LLM_API_KEY  → omitted for keyless self-hosted providers
 #   LLM_MODEL    → which model to use
 
+# The browser sends X-Mode: "saving" or "private".
+# The server always processes the chat — but only logs when saving.
+saving = self.headers.get("X-Mode", "") == "saving"
+
 payload = json.dumps({
     "model": LLM_MODEL,
     "messages": body["messages"],   # full conversation
@@ -505,10 +513,11 @@ with urllib.request.urlopen(req, timeout=10) as resp:
     result = json.loads(resp.read())
     reply = result["choices"][0]["message"]["content"]
 
-# Log the exchange for quality review
-with open(f"data/{uid}_chat.jsonl", "a") as f:
-    json.dump({"messages": body["messages"], "reply": reply}, f)
-    f.write("\\n")
+# Only log when the student opted in to saving
+if saving:
+    with open(f"data/{uid}_chat.jsonl", "a") as f:
+        json.dump({"messages": body["messages"], "reply": reply}, f)
+        f.write("\\n")
 
 self._json_response(200, {"reply": reply})
 
@@ -531,11 +540,13 @@ self._json_response(200, {"reply": reply})
     difficulty: "Project",
     icon: "🖥️",
     description:
-      "The Python server routes requests, validates input, and serves files — all with Python's built-in http.server. No frameworks, no dependencies. Every POST goes through a security pipeline before reaching the route.",
+      "The Python server routes requests, validates input, and serves files — all with Python's built-in http.server. No frameworks, no dependencies. Every POST goes through a security pipeline before reaching the route. Privacy is enforced server-side: the X-Mode header controls what gets logged.",
     concepts: [
       "Extending SimpleHTTPRequestHandler for custom routes",
       "do_GET for reading data, do_POST for writing data",
       "Security pipeline: bot check → size limit → UUID check → token verify → parse → validate → route",
+      "X-Mode header: server enforces privacy as defense-in-depth",
+      "GDPR endpoints: /api/export, /api/delete, /api/feedback",
       "ThreadingHTTPServer handles multiple users at once",
     ],
     bridges: {
@@ -550,7 +561,7 @@ self._json_response(200, {"reply": reply})
 
 class Handler(http.server.SimpleHTTPRequestHandler):
 
-    # GET: serve static files + dashboard + API reads
+    # GET: serve static files + dashboard + API reads + GDPR
     def do_GET(self):
         if self.path == f"/dashboard/{DASHBOARD_SECRET}":
             # serve dashboard (secret URL = auth)
@@ -561,6 +572,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             if not valid_uid(uid):            # ← UUID validation
                 return error(400)
             # return user's event timeline
+        elif self.path.startswith("/api/export"):
+            # return all user data as JSON (requires UID + token)
+        elif self.path == "/privacy":
+            # serve privacy policy page
         else:
             super().do_GET()  # built-in: serves index.html, app.js, etc.
 
@@ -584,14 +599,22 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
         # 5. Route to handler
         if self.path == "/api/chat":
+            saving = headers.get("X-Mode") == "saving"
             body = json.loads(...)            # ← can fail → 400
             validate_messages(body["messages"])  # ← roles, count, size
             if not check_rate(ip):            # ← rate limit
                 return error(429)
-            # forward to LLM, log, respond
+            # forward to LLM, log only if saving, respond
         elif self.path == "/api/event":
-            evt = json.loads(body)            # ← validate JSON first
+            if headers.get("X-Mode") != "saving":
+                return ok()                   # ← silently skip
+            evt = json.loads(body)
             # log to user's JSONL file
+        elif self.path == "/api/delete":
+            # explicit auth check — destructive operation
+            # delete user entry + JSONL files (under lock)
+        elif self.path == "/api/feedback":
+            # always works — stores to _feedback.jsonl (no user ID)
 
 # Multi-threaded: handles many users at once
 server = http.server.ThreadingHTTPServer(("", 3000), Handler)
@@ -682,13 +705,15 @@ if len(reply.split()) < 40:
     difficulty: "Project",
     icon: "📊",
     description:
-      "The app remembers what you've completed and what you know — all in localStorage. Your 'I've worked with' selections directly control how the AI teaches you.",
+      "The app remembers what you've completed and what you know — but only if you opt in. A three-state privacy model (ephemeral/saving/paused) controls what gets stored. Your 'I've worked with' selections always work — they directly control how the AI teaches you.",
     concepts: [
-      "localStorage as client-side persistence (no account needed)",
+      "Three-state privacy: ephemeral (default), saving, paused",
+      "Ephemeral: session-only UID, no localStorage, no server logging",
+      "Saving: persistent UID, progress + events stored locally and on server",
+      "Paused: existing data kept, but no new recording",
       "Completion tracking: count, first time, last time",
       "Spaced repetition: revisit after 1+ day, up to 3 times",
-      "\"I've worked with\" chips feed directly into buildPrompt()",
-      "Language selector: the AI responds in 20+ languages",
+      "\"I've worked with\" chips always persist (functional, not tracking data)",
     ],
     bridges: {
       Python: "localStorage is like a persistent dict — JSON.parse/stringify is like json.loads/dumps.",
@@ -698,15 +723,39 @@ if len(reply.split()) < 40:
     files: [
       {
         name: "app.js",
-        code: `// Progress stored in localStorage — no account needed.
-// Key "codeprobe" holds a JSON object:
-// { "c-pointers": {completed: 2, first: 170800000, last: 170820000} }
+        code: `// --- Privacy mode: three states ---
+// "ephemeral" (default) — nothing stored anywhere
+// "saving"              — progress + events stored locally and on server
+// "paused"              — existing data kept, no new recording
+
+function getPrivacyMode() {
+  const v = localStorage.getItem("codeprobe_privacy");
+  if (v === "saving" || v === "paused") return v;
+  return "ephemeral";
+}
+
+// --- User identity ---
+// Ephemeral: session-only UID in memory (new each page load, never stored)
+// Saving/paused: persistent UID in localStorage (survives across sessions)
+let _sessionUID = null;
+
+function getUID() {
+  const stored = localStorage.getItem("codeprobe_uid");
+  if (stored) return stored;
+  if (!_sessionUID) _sessionUID = crypto.randomUUID();
+  return _sessionUID;
+}
+
+// --- Progress (only when saving or paused) ---
+// Key "codeprobe" holds: { "c-pointers": {completed: 2, first: ..., last: ...} }
 
 function getProgress() {
+  if (getPrivacyMode() === "ephemeral") return {};  // nothing to show
   return JSON.parse(localStorage.getItem("codeprobe") || "{}");
 }
 
 function saveCompletion(id) {
+  if (getPrivacyMode() === "ephemeral") return;  // don't store
   const p = getProgress();
   if (!p[id]) p[id] = { completed: 0, first: Date.now() };
   p[id].completed++;
@@ -714,42 +763,27 @@ function saveCompletion(id) {
   localStorage.setItem("codeprobe", JSON.stringify(p));
 }
 
-// Spaced repetition: suggest revisiting after 1+ day
+// Spaced repetition: suggest revisiting after 1+ day, up to 3 times
 function shouldRevisit(id) {
   const p = getProgress()[id];
   if (!p) return false;
-  // Not done in 24 hours AND completed fewer than 3 times
   return (Date.now() - p.last) / 86400000 >= 1 && p.completed < 3;
 }
 
-// "I've worked with" chips are also in localStorage.
-// When you select Python, buildPrompt() includes Python bridges.
-// When you select "Memory management", the AI won't over-explain it.
-
-const LANG_CHIPS = [
-  "Python", "JavaScript", "Java", "C", "C++",
-  "TypeScript", "Ruby", "Rust", "Go", "C#",
-];
-const CONCEPT_CHIPS = [
-  "OOP", "Data structures", "Memory management",
-  "Concurrency", "Functional programming", "Databases / SQL", "Algorithms",
-];
-
+// --- "I've worked with" chips always persist (functional, not tracking) ---
+// They affect tutoring quality: buildPrompt() uses them for bridges.
+// Stored in localStorage regardless of privacy mode.
 function getKnownLangs() {
   return getKnownItems().filter(i => LANG_CHIPS.includes(i));
 }
-// getKnownLangs() → buildPrompt() → bridges filtered → AI teaches your way
-
-// Language selector — stored in localStorage, sent to buildPrompt().
-// The AI is instructed to respond entirely in the chosen language.
-// state.lang = localStorage.getItem("codeprobe_lang") || "en";`,
+// getKnownLangs() → buildPrompt() → bridges filtered → AI teaches your way`,
       },
     ],
     seedQuestions: [
-      "Why use localStorage instead of a server database?",
+      "Why default to ephemeral instead of saving?",
+      "Why do 'I've worked with' chips persist even in ephemeral mode?",
       "How does selecting 'Python' change what the AI says?",
-      "Why is the spaced repetition threshold 3 completions?",
-      "What would happen to progress if the user clears their browser data?",
+      "What happens when a student toggles saving off then back on?",
     ],
   },
 
@@ -759,12 +793,13 @@ function getKnownLangs() {
     difficulty: "Project",
     icon: "🛡️",
     description:
-      "Every API endpoint is a door. If you don't check who's knocking and what they're carrying, bad things happen. Here's how codeprobe validates every request — and why each check exists.",
+      "Every API endpoint is a door. If you don't check who's knocking and what they're carrying, bad things happen. Here's how codeprobe validates every request — and why each check exists. Destructive operations like delete get extra auth hardening.",
     concepts: [
       "Path traversal: why UIDs must be validated as UUIDs",
       "Body size limits prevent memory exhaustion (DoS)",
       "Message validation: role whitelist, count caps, size caps",
-      "Rate limiting per IP to prevent abuse",
+      "Rate limiting per IP — in-memory only, never persisted (privacy-safe)",
+      "Hardened auth on destructive endpoints (explicit UID + token check)",
       "Parse-then-write: never trust raw input",
     ],
     bridges: {
@@ -788,9 +823,11 @@ MAX_BODY = 256 * 1024   # 256KB — generous, but prevents gigabyte payloads
 def valid_uid(uid):
     return bool(_UUID_RE.match(uid))
 
-# Rate limiting: track timestamps per IP, reject if over 30/hour
+# Rate limiting: track timestamps per IP, reject if over 30/hour.
+# Stored in-memory only — never written to disk.
+# This is privacy-safe: GDPR covers persistent data, not ephemeral counters.
 _lock = threading.Lock()
-_chat_hits = {}   # {ip: [timestamp, ...]}
+_chat_hits = {}   # {ip: [timestamp, ...]} — lost on server restart
 
 def check_rate(ip):
     with _lock:
@@ -800,7 +837,13 @@ def check_rate(ip):
             return False      # over limit
         hits.append(now)
         _chat_hits[ip] = hits
-        return True`,
+        return True
+
+# Destructive endpoints get explicit auth — don't rely on the
+# generic pipeline check (which silently skips if UID is empty).
+# /api/delete:
+if not uid or not valid_uid(uid) or token != make_token(uid):
+    return error(403)   # must prove you own this UUID`,
       },
       {
         name: "validate.py",
@@ -839,8 +882,8 @@ def validate_messages(messages):
     seedQuestions: [
       "What exactly is path traversal — how would ../../ escape the data directory?",
       "Why validate the UID with a regex instead of just checking if the file exists?",
-      "What happens if you skip the body size check — how would an attacker exploit it?",
-      "Why limit to one system message at position 0 — what's the prompt injection risk?",
+      "Why does /api/delete have its own auth check on top of the generic pipeline?",
+      "Why is it privacy-safe to keep rate-limit counters by raw IP in memory?",
     ],
   },
 ] };

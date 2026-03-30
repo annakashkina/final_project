@@ -110,48 +110,8 @@ def get_real_ip(handler):
     return handler.client_address[0]
 
 
-def find_user_by_ip_ua(users, ip, ua):
-    """Find existing user with matching IP + User-Agent."""
-    for existing_uid, meta in users.items():
-        if meta.get("ip") == ip and meta.get("ua") == ua:
-            return existing_uid
-    return None
-
-
-def get_completions(uid):
-    """Extract lesson completion progress from a user's event file."""
-    event_file = os.path.join(DATA_DIR, f"{uid}.jsonl")
-    completions = {}
-    if os.path.exists(event_file):
-        for line in open(event_file):
-            try:
-                evt = json.loads(line)
-                if evt.get("type") == "lesson_complete":
-                    lid = evt.get("lesson", "")
-                    if lid:
-                        if lid not in completions:
-                            completions[lid] = {"completed": 0, "first": evt["ts"]}
-                        completions[lid]["completed"] += 1
-                        completions[lid]["last"] = evt["ts"]
-            except (json.JSONDecodeError, KeyError):
-                pass
-    return completions
-
-
 def ensure_data_dir():
     os.makedirs(DATA_DIR, exist_ok=True)
-
-
-def ip_geo(ip):
-    """Look up country code + ISP from IP using ip-api.com."""
-    if ip in ("127.0.0.1", "::1", "localhost"):
-        return "", ""
-    try:
-        with urllib.request.urlopen(f"http://ip-api.com/json/{ip}?fields=countryCode,isp", timeout=2) as r:
-            data = json.loads(r.read())
-            return data.get("countryCode", ""), data.get("isp", "")
-    except Exception:
-        return "", ""
 
 
 def load_users():
@@ -209,11 +169,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                     continue
                 result.append({
                     "uid": uid,
-                    "ua": meta.get("ua", ""),
-                    "ip": meta.get("ip", ""),
-                    "cc": meta.get("cc", ""),
-                    "isp": meta.get("isp", ""),
                     "first_seen": meta.get("first_seen", 0),
+                    "consent_ts": meta.get("consent_ts", 0),
                     "events": count,
                     "last_ts": last_ts,
                 })
@@ -240,6 +197,41 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                         except json.JSONDecodeError:
                             pass
             self._json_response(200, events)
+
+        elif self.path.startswith("/api/export"):
+            uid = self.headers.get("X-UID", "")
+            token = self.headers.get("X-Token", "")
+            if not uid or not valid_uid(uid) or token != make_token(uid):
+                self._json_response(403, {"error": "forbidden"})
+                return
+            ensure_data_dir()
+            result = {"uid": uid, "events": [], "chats": []}
+            event_file = os.path.join(DATA_DIR, f"{uid}.jsonl")
+            if os.path.exists(event_file):
+                with open(event_file) as f:
+                    for line in f:
+                        try: result["events"].append(json.loads(line))
+                        except json.JSONDecodeError: pass
+            chat_file = os.path.join(DATA_DIR, f"{uid}_chat.jsonl")
+            if os.path.exists(chat_file):
+                with open(chat_file) as f:
+                    for line in f:
+                        try: result["chats"].append(json.loads(line))
+                        except json.JSONDecodeError: pass
+            self._json_response(200, result)
+
+        elif self.path == "/privacy":
+            priv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "privacy.html")
+            if os.path.exists(priv_path):
+                with open(priv_path, "rb") as f:
+                    content = f.read()
+            else:
+                content = b"<html><body><h1>Privacy</h1><p>Privacy policy not found.</p></body></html>"
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html")
+            self.send_header("Content-Length", str(len(content)))
+            self.end_headers()
+            self.wfile.write(content)
 
         else:
             super().do_GET()
@@ -284,6 +276,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 self._json_response(400, {"error": msg_err})
                 return
 
+            saving = self.headers.get("X-Mode", "") == "saving"
+
             payload = json.dumps({
                 "model": LLM_MODEL,
                 "messages": body["messages"],
@@ -316,32 +310,31 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             used_messages = body["messages"]
 
             if needs_retry:
-                # Log failed attempt to chat history
-                ensure_data_dir()
-                chat_file = os.path.join(DATA_DIR, f"{uid}_chat.jsonl")
-                failed_record = {
-                    "ts": int(time.time() * 1000),
-                    "model": LLM_MODEL,
-                    "messages": body["messages"],
-                    "reply": reply,
-                    "error": error_info[1] if error_info else None,
-                    "failed": True,
-                }
-                with _lock:
-                    with open(chat_file, "a") as cf:
-                        cf.write(json.dumps(failed_record) + "\n")
+                if saving:
+                    ensure_data_dir()
+                    chat_file = os.path.join(DATA_DIR, f"{uid}_chat.jsonl")
+                    failed_record = {
+                        "ts": int(time.time() * 1000),
+                        "model": LLM_MODEL,
+                        "messages": body["messages"],
+                        "reply": reply,
+                        "error": error_info[1] if error_info else None,
+                        "failed": True,
+                    }
+                    with _lock:
+                        with open(chat_file, "a") as cf:
+                            cf.write(json.dumps(failed_record) + "\n")
 
-                # Log retry event to user's dashboard timeline
-                event_file = os.path.join(DATA_DIR, f"{uid}.jsonl")
-                retry_evt = {
-                    "type": "tutor_retry",
-                    "ts": int(time.time() * 1000),
-                    "reason": "error" if error_info else "too_short",
-                    "original": reply,
-                }
-                with _lock:
-                    with open(event_file, "a") as ef:
-                        ef.write(json.dumps(retry_evt) + "\n")
+                    event_file = os.path.join(DATA_DIR, f"{uid}.jsonl")
+                    retry_evt = {
+                        "type": "tutor_retry",
+                        "ts": int(time.time() * 1000),
+                        "reason": "error" if error_info else "too_short",
+                        "original": reply,
+                    }
+                    with _lock:
+                        with open(event_file, "a") as ef:
+                            ef.write(json.dumps(retry_evt) + "\n")
 
                 # Retry after 1s with trailing space on last message to avoid caching
                 time.sleep(1)
@@ -378,69 +371,96 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 self._json_response(error_info[0], {"error": error_info[1]})
                 return
 
-            # Log final exchange to chat history
-            ensure_data_dir()
-            chat_file = os.path.join(DATA_DIR, f"{uid}_chat.jsonl")
-            chat_record = {
-                "ts": int(time.time() * 1000),
-                "model": LLM_MODEL,
-                "messages": used_messages,
-                "reply": reply,
-            }
-            with _lock:
-                with open(chat_file, "a") as cf:
-                    cf.write(json.dumps(chat_record) + "\n")
+            # Log final exchange to chat history (only in saving mode)
+            if saving:
+                ensure_data_dir()
+                chat_file = os.path.join(DATA_DIR, f"{uid}_chat.jsonl")
+                chat_record = {
+                    "ts": int(time.time() * 1000),
+                    "model": LLM_MODEL,
+                    "messages": used_messages,
+                    "reply": reply,
+                }
+                with _lock:
+                    with open(chat_file, "a") as cf:
+                        cf.write(json.dumps(chat_record) + "\n")
             self._json_response(200, {"reply": reply})
 
         elif self.path == "/api/event":
+            # Only log events when student is in saving mode
+            if self.headers.get("X-Mode", "") != "saving":
+                if length:
+                    self.rfile.read(length)  # drain body for HTTP/1.1
+                self._json_response(200, {"ok": True})
+                return
+
             body = self.rfile.read(length) if length else b"{}"
             try:
                 evt_data = json.loads(body)
             except (json.JSONDecodeError, ValueError):
                 self._json_response(400, {"error": "invalid json"})
                 return
-            uid = self.headers.get("X-UID", "anonymous")
+            uid = self.headers.get("X-UID", "")
 
             ensure_data_dir()
 
-            resp = {"ok": True}
-            effective_uid = uid
-            need_geo = None
-
             with _lock:
                 users = load_users()
-
+                now = int(time.time() * 1000)
                 if uid not in users:
-                    ip = get_real_ip(self)
-                    ua = self.headers.get("User-Agent", "")
-
-                    # Try to match existing user by IP + UA
-                    matched = find_user_by_ip_ua(users, ip, ua)
-                    if matched:
-                        effective_uid = matched
-                        resp["uid"] = matched
-                        progress = get_completions(matched)
-                        if progress:
-                            resp["progress"] = progress
-                    else:
-                        need_geo = (ip, ua)
-
-            # Do slow geo lookup outside the lock
-            if need_geo:
-                ip, ua = need_geo
-                cc, isp = ip_geo(ip)
-                with _lock:
-                    users = load_users()
-                    users[uid] = {"ip": ip, "ua": ua, "cc": cc, "isp": isp, "first_seen": int(time.time() * 1000)}
+                    users[uid] = {"first_seen": now, "consent_ts": now}
+                    save_users(users)
+                elif "consent_ts" not in users[uid]:
+                    users[uid]["consent_ts"] = now
                     save_users(users)
 
-            # Append event to effective user's JSONL file
-            event_file = os.path.join(DATA_DIR, f"{effective_uid}.jsonl")
+            event_file = os.path.join(DATA_DIR, f"{uid}.jsonl")
             with _lock:
                 with open(event_file, "a") as f:
                     f.write(json.dumps(evt_data) + "\n")
 
-            self._json_response(200, resp)
+            self._json_response(200, {"ok": True})
+
+        elif self.path == "/api/delete":
+            if length:
+                self.rfile.read(length)  # drain body for HTTP/1.1
+            # Explicit auth check — destructive operation
+            if not uid or not valid_uid(uid) or token != make_token(uid):
+                self._json_response(403, {"error": "forbidden"})
+                return
+            ensure_data_dir()
+            with _lock:
+                users = load_users()
+                if uid in users:
+                    del users[uid]
+                    save_users(users)
+                for suffix in ["", "_chat"]:
+                    fpath = os.path.join(DATA_DIR, f"{uid}{suffix}.jsonl")
+                    if os.path.exists(fpath):
+                        os.remove(fpath)
+            self._json_response(200, {"ok": True})
+
+        elif self.path == "/api/feedback":
+            body = self.rfile.read(length) if length else b"{}"
+            try:
+                data = json.loads(body)
+            except (json.JSONDecodeError, ValueError):
+                self._json_response(400, {"error": "invalid json"})
+                return
+            text = data.get("text", "").strip()
+            if not text:
+                self._json_response(400, {"error": "text required"})
+                return
+            ensure_data_dir()
+            record = {
+                "ts": int(time.time() * 1000),
+                "text": text,
+                "lesson": data.get("lesson"),
+            }
+            with _lock:
+                with open(os.path.join(DATA_DIR, "_feedback.jsonl"), "a") as f:
+                    f.write(json.dumps(record) + "\n")
+            self._json_response(200, {"ok": True})
 
         else:
             self.send_response(404)
@@ -461,7 +481,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.send_header("Content-Length", "0")
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-UID, X-Token")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-UID, X-Token, X-Mode")
         self.end_headers()
 
     def log_message(self, fmt, *args):

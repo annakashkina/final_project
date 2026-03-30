@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>codeprobe</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="style.css?v=5">
+  <link rel="stylesheet" href="style.css?v=6">
   <link id="hljs-light" rel="stylesheet"
         href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
   <link id="hljs-dark" rel="stylesheet" disabled
@@ -46,6 +46,21 @@
       <span class="i-know-label">I've worked with</span>
       <div id="i-know-chips" class="i-know-chips"></div>
     </div>
+    <div id="save-toggle-area" class="save-toggle-area">
+      <label class="save-label">
+        <input type="checkbox" id="save-check">
+        <span>save my progress</span>
+      </label>
+      <a href="/privacy" target="_blank" class="text-btn privacy-link">privacy</a>
+      <div id="save-info" class="save-info hidden">
+        <span id="save-status"></span>
+        <span class="save-actions">
+          <button id="export-btn" class="text-btn">export</button>
+          <button id="delete-btn" class="text-btn delete-btn">delete all</button>
+        </span>
+      </div>
+    </div>
+
     <div id="lesson-grid" class="grid"></div>
     <p class="proto-footer">what's missing?</p>
   </main>
@@ -138,6 +153,6 @@
   </main>
 
   <div id="toast" class="toast hidden"></div>
-  <script type="module" src="app.js?v=6"></script>
+  <script type="module" src="app.js?v=7"></script>
 </body>
 </html>

@@ -121,11 +121,6 @@
       return d.innerHTML;
     }
 
-    function flag(cc) {
-      if (!cc || cc.length !== 2) return "";
-      return String.fromCodePoint(...[...cc.toUpperCase()].map(c => 0x1F1E6 + c.charCodeAt(0) - 65));
-    }
-
     async function loadUsers() {
       const minEv = document.getElementById("hide-bots").checked ? 2 : 0;
       const resp = await fetch(`/api/users?key=${dashKey}&min_events=${minEv}`);
@@ -139,9 +134,8 @@
 
       el.innerHTML = users.map(u => `
         <div class="user-item ${u.uid === currentUID ? 'active' : ''}" data-uid="${u.uid}">
-          <div class="user-id">${flag(u.cc)} ${u.uid.slice(0, 8)}</div>
-          <div class="user-meta">${esc(u.ua.split(') ')[0]?.split('(')[1] || u.ua.slice(0, 40))}</div>
-          ${u.isp ? `<div class="user-meta">${esc(u.isp)}</div>` : ""}
+          <div class="user-id">${u.uid.slice(0, 8)}</div>
+          <div class="user-meta">consented ${u.consent_ts ? relTime(u.consent_ts) : "—"}</div>
           <div class="user-stats">
             <span>${u.events} events</span>
             <span>${u.last_ts ? relTime(u.last_ts) : "—"}</span>
