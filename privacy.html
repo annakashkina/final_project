@@ -25,7 +25,7 @@
 </head>
 <body>
   <h1>Privacy</h1>
-  <div class="subtitle">codeprobe</div>
+  <div class="subtitle">codeprobe &mdash; a university research project</div>
 
   <h2>By default, nothing is stored</h2>
   <p>When you use codeprobe without enabling "save my progress", your learning is completely private. No data is stored on the server or in your browser. Conversations with the AI tutor are processed in real time and not recorded.</p>
@@ -39,6 +39,7 @@
     <li>Your learning choices (mode, language, questions asked)</li>
     <li>A timestamp of when you gave consent</li>
   </ul>
+  <p>Saving is opt-in and based on your consent. You can withdraw it at any time by toggling saving off.</p>
 
   <h2>What we never collect</h2>
   <ul>
@@ -49,7 +50,16 @@
   </ul>
 
   <h2>AI provider</h2>
-  <p>Conversations are sent to the configured AI provider for tutoring. These requests are anonymous &mdash; they contain only the lesson code and your messages, with no other information that identifies you. The AI provider's own privacy policy applies to that processing.</p>
+  <p>Conversations are sent to <a href="https://groq.com/privacy-policy" target="_blank">Groq</a> (United States) for AI tutoring. These requests are anonymous &mdash; they contain only the lesson code and your messages, with no identifying information. Groq operates under <a href="https://console.groq.com/docs/legal/customer-data-processing-addendum" target="_blank">EU Standard Contractual Clauses</a> for cross-border data transfers. Zero data retention is enabled &mdash; Groq does not store inputs or outputs.</p>
+
+  <h2>Security and rate limiting</h2>
+  <p>To protect the service from abuse, your IP address is processed in server memory for rate limiting. IP addresses are never written to disk, logged, or shared &mdash; they are held in memory only and cleared when the server restarts.</p>
+
+  <h2>Data retention</h2>
+  <p>If you enable saving, your data is kept for up to 90 days after your last activity. After that, it is automatically deleted. You can also delete your data at any time using the controls on the home page.</p>
+
+  <h2>Where data is stored</h2>
+  <p>Data is stored on a server in the European Economic Area (Netherlands). It is not shared with any third parties beyond the AI provider described above.</p>
 
   <h2>Your rights</h2>
   <ul>
@@ -58,9 +68,6 @@
     <li><strong>Export</strong> &mdash; download all your stored data as a JSON file</li>
     <li><strong>Delete</strong> &mdash; permanently remove all your data from the server</li>
   </ul>
-  <p>All controls are available on the home page. No account or login is needed.</p>
-
-  <h2>Data storage</h2>
-  <p>Data is stored as files on the server hosting this application. It is not shared with any third parties beyond the AI provider used for tutoring.</p>
+  <p>All controls are on the home page. No account or login needed. If you believe your data rights have not been respected, you can contact your local <a href="https://edpb.europa.eu/about-edpb/about-edpb/members_en" target="_blank">data protection authority</a>.</p>
 </body>
 </html>

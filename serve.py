@@ -47,6 +47,7 @@ _lock = threading.Lock()
 _chat_hits = {}
 CHAT_RATE_LIMIT = 30      # max requests
 CHAT_RATE_WINDOW = 3600    # per hour
+RETENTION_DAYS = 90        # auto-delete inactive data after this many days
 
 
 def valid_uid(uid):
@@ -112,6 +113,46 @@ def get_real_ip(handler):
 
 def ensure_data_dir():
     os.makedirs(DATA_DIR, exist_ok=True)
+
+
+def cleanup_expired_data():
+    """Delete user data files inactive for more than RETENTION_DAYS."""
+    if not os.path.exists(DATA_DIR):
+        return
+    cutoff = time.time() - (RETENTION_DAYS * 86400)
+    with _lock:
+        users = load_users()
+        expired = []
+        for uid in list(users.keys()):
+            event_file = os.path.join(DATA_DIR, f"{uid}.jsonl")
+            chat_file = os.path.join(DATA_DIR, f"{uid}_chat.jsonl")
+            mtime = 0
+            has_files = False
+            for fpath in (event_file, chat_file):
+                if os.path.exists(fpath):
+                    has_files = True
+                    mtime = max(mtime, os.path.getmtime(fpath))
+            if not has_files or mtime < cutoff:
+                expired.append(uid)
+                for fpath in (event_file, chat_file):
+                    if os.path.exists(fpath):
+                        os.remove(fpath)
+        for uid in expired:
+            del users[uid]
+        if expired:
+            save_users(users)
+            print(f"Retention cleanup: removed {len(expired)} inactive users", file=sys.stderr)
+
+
+def schedule_cleanup():
+    """Run cleanup on startup and every 24 hours."""
+    try:
+        cleanup_expired_data()
+    except Exception as e:
+        print(f"Retention cleanup error: {e}", file=sys.stderr)
+    timer = threading.Timer(86400, schedule_cleanup)
+    timer.daemon = True
+    timer.start()
 
 
 def load_users():
@@ -497,6 +538,7 @@ if __name__ == "__main__":
     print(f"Dashboard at http://localhost:{port}/dashboard/{DASHBOARD_SECRET}")
     print(f"Using model: {LLM_MODEL}")
     print(f"API: {LLM_API_URL}")
+    schedule_cleanup()
     server = http.server.ThreadingHTTPServer(("", port), Handler)
     server.request_queue_size = 64
     server.socket.listen(64)
