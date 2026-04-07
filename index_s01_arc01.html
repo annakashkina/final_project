@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="codeprobe-lessons" content="./lessons_s01_arc01.js">
+  <title>codeprobe — Season 01 Arc 01</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="style.css?v=7">
+  <link id="hljs-light" rel="stylesheet"
+        href="vendor/highlight.js/styles/github.min.css">
+  <link id="hljs-dark" rel="stylesheet" disabled
+        href="vendor/highlight.js/styles/github-dark.min.css">
+  <script src="vendor/highlight.js/highlight.min.js"></script>
+  <script src="vendor/highlight.js/languages/rust.min.js"></script>
+  <script src="vendor/highlight.js/languages/typescript.min.js"></script>
+  <script src="vendor/highlight.js/languages/ruby.min.js"></script>
+  <script src="vendor/highlight.js/languages/cpp.min.js"></script>
+</head>
+<body>
+
+  <div id="proto-banner" style="cursor:pointer">share your feedback!</div>
+
+  <div id="feedback-modal" class="hidden" style="position:fixed;inset:0;z-index:300;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.45)">
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:20px;width:min(420px,90vw);box-shadow:0 8px 32px rgba(0,0,0,0.3)">
+      <div style="font-weight:600;margin-bottom:8px">feedback</div>
+      <textarea id="feedback-text" rows="4" placeholder="What's working? What's confusing? What's missing?" style="width:100%;resize:vertical;padding:8px;border-radius:4px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit;font-size:13px"></textarea>
+      <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:10px">
+        <button id="feedback-cancel" class="btn-secondary">cancel</button>
+        <button id="feedback-send" class="btn-primary">send</button>
+      </div>
+    </div>
+  </div>
+
+  <header id="header">
+    <div class="header-left">
+      <button id="back-btn" class="back-btn hidden">&larr;</button>
+      <a href="/" class="logo">codeprobe</a>
+      <span class="header-flow">ask questions <span class="flow-arrow">&rarr;</span> get quizzed <span class="flow-arrow">&rarr;</span> build understanding</span>
+    </div>
+    <button id="theme-toggle" class="theme-toggle" title="Toggle theme"></button>
+  </header>
+
+  <!-- Home -->
+  <main id="home" class="view">
+    <div id="i-know" class="i-know">
+      <span class="i-know-label">I've worked with</span>
+      <div id="i-know-chips" class="i-know-chips"></div>
+    </div>
+    <div id="save-toggle-area" class="save-toggle-area">
+      <label class="save-label">
+        <input type="checkbox" id="save-check">
+        <span>save my progress</span>
+      </label>
+      <a href="/privacy" target="_blank" class="text-btn privacy-link">privacy</a>
+      <div id="save-info" class="save-info hidden">
+        <span id="save-status"></span>
+        <span class="save-actions">
+          <button id="export-btn" class="text-btn">export</button>
+          <button id="delete-btn" class="text-btn delete-btn">delete all</button>
+        </span>
+      </div>
+    </div>
+
+    <div id="lesson-grid" class="grid"></div>
+    <p class="proto-footer">what's missing?</p>
+  </main>
+
+  <!-- Lesson -->
+  <main id="lesson-view" class="view hidden">
+    <div class="lesson-layout">
+
+      <div class="code-panel">
+
+        <div class="panel-bar">
+          <div id="file-tabs" class="file-tabs"></div>
+          <button id="copy-code-btn" class="text-btn">copy</button>
+        </div>
+        <pre><code id="code-display"></code></pre>
+      </div>
+
+      <div id="drag-handle" class="drag-handle"></div>
+
+      <div class="chat-panel">
+        <div id="phase-bar" class="phase-bar">
+          <span class="phase active" data-phase="explore">1 explore</span>
+          <span class="phase" data-phase="learn">2 learn</span>
+          <span class="phase" data-phase="challenge">3 challenge</span>
+          <span class="phase" data-phase="done">4 done</span>
+        </div>
+
+        <!-- Explore -->
+        <div id="phase-explore" class="phase-content">
+          <div class="explore-intro">
+            <p><strong>Read the code on the left.</strong> Then write down what you'd like to understand about it.</p>
+            <p class="small dim">Don't worry about getting it right &mdash; just write what catches your eye or confuses you.</p>
+          </div>
+          <div id="seed-questions" class="seeds"></div>
+          <textarea id="user-questions"
+                    placeholder="Your questions about this code...&#10;&#10;Or hit &quot;Let's just learn this stuff!&quot; and start immediately!"
+                    rows="4"></textarea>
+          <div class="actions">
+            <select id="lang-select">
+              <option value="en">English</option>
+              <option value="es">Espanol</option>
+              <option value="fr">Francais</option>
+              <option value="de">Deutsch</option>
+              <option value="it">Italiano</option>
+              <option value="pt">Portugues</option>
+              <option value="ru">Русский</option>
+              <option value="zh">中文</option>
+              <option value="ja">日本語</option>
+              <option value="ko">한국어</option>
+              <option value="ar">العربية</option>
+              <option value="hi">हिन्दी</option>
+              <option value="tr">Turkce</option>
+              <option value="nl">Nederlands</option>
+              <option value="pl">Polski</option>
+              <option value="uk">Українська</option>
+              <option value="vi">Tieng Viet</option>
+              <option value="th">ไทย</option>
+              <option value="et">Eesti</option>
+              <option value="lv">Latviešu</option>
+              <option value="lt">Lietuviu</option>
+            </select>
+            <div id="mode-toggle" class="mode-toggle">
+              <button class="mode-opt active" data-mode="quick">quick</button>
+              <button class="mode-opt" data-mode="full">extended</button>
+            </div>
+            <button id="start-btn" class="btn-primary">start learning</button>
+            <button id="copy-prompt-btn" class="btn-secondary">copy</button>
+          </div>
+        </div>
+
+        <!-- Chat -->
+        <div id="phase-chat" class="phase-content hidden">
+          <div id="exchange-bar" class="exchange-bar">
+            <span id="exchange-text"></span>
+          </div>
+          <div id="chat-messages" class="messages"></div>
+          <div class="input-row">
+            <textarea id="chat-input" placeholder="your answer..." rows="2"></textarea>
+            <button id="send-btn" class="btn-primary">send</button>
+          </div>
+        </div>
+
+        <!-- Done -->
+        <div id="phase-complete" class="phase-content hidden">
+          <div id="confetti"></div>
+          <div id="completion-card" class="completion"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <div id="toast" class="toast hidden"></div>
+  <script type="module" src="app.js?v=9"></script>
+</body>
+</html>

@@ -1,4 +1,6 @@
-import { lessons, series } from "./lessons.js";
+// Dynamic lesson loading — set <meta name="codeprobe-lessons"> in HTML to override
+const _lessonsSrc = document.querySelector('meta[name="codeprobe-lessons"]')?.content || "./lessons.js";
+const { lessons, series } = await import(_lessonsSrc);
 
 // --- Privacy mode: ephemeral (default) / saving / paused ---
 function getPrivacyMode() {
@@ -261,25 +263,21 @@ function buildPrompt(lesson, questions) {
   const isQuick = state.mode === "quick";
 
   const approach = isQuick
-    ? `APPROACH:
-1. Briefly address their questions if any
-2. Teach ONE key concept from the code${bridgeNote}
-3. After each concept, quiz them immediately — predict output, explain why, spot an issue
-4. Give feedback on answers. Correct kindly, deepen if right.
-5. After their answer, you decide:
-   a) if their answer is correct AND shows understanding, give brief feedback, summarize what they learned in 1 sentence, and VERY IMPORTANT to end with [LESSON_COMPLETE].
-   b) if the answer is wrong, incomplete, or "I don't know": explain kindly, then say "Final challenge:" and ask a NEW question so they can demonstrate understanding. Do NOT end with [LESSON_COMPLETE] until they answer a question correctly.
-CRITICAL: Never use [LESSON_COMPLETE] in the same response where you had to significantly correct the person. The student must answer at least one question right before the lesson ends. But if you chose to correct and NOT finish yet, always ask some quiz.
+    ? `Your job is to QUIZ the student, not lecture them. Address their question briefly (1-2 sentences)${bridgeNote}, then immediately ask ONE quiz question about the code. The student learns by attempting the question, not by reading an explanation.
+
+After they answer:
+- If correct: brief feedback, 1-sentence summary, end with [LESSON_COMPLETE].
+- If wrong: short correction, ask a NEW question. Do NOT end with [LESSON_COMPLETE] until they answer a question correctly.
+CRITICAL: Never use [LESSON_COMPLETE] in the same response where you corrected the student.
 
 RULES: Be conversational. ONE question only. Use backtick code snippets. Reference specific lines. ~1-2 total exchanges. Only reference languages the student knows — do NOT assume knowledge of languages not listed.${levelNote}`
-    : `APPROACH:
-1. Address their questions about the code
-2. Teach ONE concept at a time${bridgeNote}
-3. After each concept, quiz them immediately — predict output, explain why, spot an issue
-4. Give feedback on answers. Correct kindly, deepen if right.
-5. After 4-5 exchanges, say "Final challenge:" and give a synthesis question
-6. After they answer the final challenge correctly, summarize what they learned in 2-3 sentences, and VERY IMPORTANT to end with [LESSON_COMPLETE]
-CRITICAL: Never use [LESSON_COMPLETE] in the same response where you had to significantly correct the person. The student must answer at least one question right before the lesson ends. If you chose to correct and NOT finish yet, always ask some quiz.
+    : `Your job is to QUIZ the student, not lecture them. Address their question briefly (1-2 sentences)${bridgeNote}, then immediately ask ONE quiz question about the code. The student learns by attempting the question, not by reading an explanation.
+
+After they answer:
+- If correct AND it's been 4-5 exchanges: brief feedback, summarize what they learned in 2-3 sentences, end with [LESSON_COMPLETE].
+- If correct but early: brief feedback, teach the next concept in 1-2 sentences, ask a NEW quiz question.
+- If wrong: short correction, ask a NEW question. Do NOT end with [LESSON_COMPLETE] until they answer a question correctly.
+CRITICAL: Never use [LESSON_COMPLETE] in the same response where you corrected the student.
 
 RULES: Be conversational. ONE question at a time. Use backtick code snippets. Reference specific lines. ~5-7 total exchanges. Only reference languages the student knows — do NOT assume knowledge of languages not listed.${levelNote}`;
 
@@ -426,16 +424,38 @@ function renderCode(idx) {
 
 function renderSeeds() {
   const el = $("#seed-questions");
-  el.innerHTML = state.lesson.seedQuestions
+  const seeds = state.lesson.seedQuestions
     .map(q => `<span class="seed">${q}</span>`).join("");
-  el.querySelectorAll(".seed").forEach(s =>
+  el.innerHTML =
+    `<span class="seed seed-go">Let's just learn this stuff!</span>` +
+    `<span class="seed-toggle">what to ask <span class="seed-arrow">&#9662;</span></span>` +
+    `<div class="seed-drawer hidden">${seeds}</div>`;
+  el.querySelector(".seed-go").addEventListener("click", () => {
+    track("seed_click", { text: "lets_learn" });
+    startLearning();
+  });
+  el.querySelector(".seed-toggle").addEventListener("click", () => {
+    const drawer = el.querySelector(".seed-drawer");
+    const arrow = el.querySelector(".seed-arrow");
+    drawer.classList.toggle("hidden");
+    arrow.textContent = drawer.classList.contains("hidden") ? "\u25BE" : "\u25B4";
+  });
+  el.querySelectorAll(".seed-drawer .seed").forEach(s =>
     s.addEventListener("click", () => {
       const ta = $("#user-questions");
       ta.value = ta.value ? ta.value + "\n" + s.textContent : s.textContent;
       ta.focus();
       track("seed_click", { text: s.textContent });
+      syncStartButtons();
     })
   );
+  syncStartButtons();
+}
+
+function syncStartButtons() {
+  const hasText = $("#user-questions").value.trim().length > 0;
+  $(".seed-go").style.display = hasText ? "none" : "";
+  $("#start-btn").style.display = hasText ? "" : "none";
 }
 
 // Phases
@@ -528,7 +548,7 @@ function renderDone(summary) {
 
   $("#completion-card").innerHTML = `
     <h2>you understand this now.</h2>
-    <div class="concepts">${lesson.concepts.map(c => `<span class="tag">${c}</span>`).join("")}</div>
+    <div class="concepts">${lesson.concepts.map(c => `<span class="tag">${c.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</span>`).join("")}</div>
     <div class="summary">${fmt(summary)}</div>
     ${first ? `<div class="revisit-note">come back tomorrow to revisit this lesson &mdash; spaced repetition dramatically improves retention.</div>` : ""}
     <div class="comp-actions">
@@ -679,6 +699,7 @@ $("#back-btn").addEventListener("click", () => {
   navigate(null);
 });
 $("#start-btn").addEventListener("click", startLearning);
+$("#user-questions").addEventListener("input", syncStartButtons);
 $$("#mode-toggle .mode-opt").forEach(btn => {
   btn.addEventListener("click", () => {
     state.mode = btn.dataset.mode;

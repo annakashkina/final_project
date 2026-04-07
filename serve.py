@@ -9,6 +9,12 @@ import os
 import sys
 import time
 
+try:
+    from validator import fix_line_refs, extract_code_from_messages
+    VALIDATOR_ENABLED = True
+except ImportError:
+    VALIDATOR_ENABLED = False
+
 # Load .env file if present
 env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
 if os.path.exists(env_path):
@@ -19,7 +25,7 @@ if os.path.exists(env_path):
             os.environ.setdefault(k.strip(), v.strip())
 
 LLM_API_KEY = os.environ.get("LLM_API_KEY") or os.environ.get("GROQ_API_KEY", "")
-LLM_MODEL = os.environ.get("LLM_MODEL") or os.environ.get("GROQ_MODEL", "moonshotai/kimi-k2-instruct")
+LLM_MODEL = os.environ.get("LLM_MODEL") or os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b")
 LLM_API_URL = os.environ.get("LLM_API_URL") or os.environ.get("GROQ_URL", "https://api.groq.com/openai/v1/chat/completions")
 DASHBOARD_SECRET = os.environ.get("DASHBOARD_SECRET") or LLM_API_KEY
 
@@ -45,9 +51,15 @@ _lock = threading.Lock()
 
 # Rate limiting for /api/chat: {ip: [timestamp, ...]}
 _chat_hits = {}
-CHAT_RATE_LIMIT = 30      # max requests
+CHAT_RATE_LIMIT = 60      # max requests
 CHAT_RATE_WINDOW = 3600    # per hour
 RETENTION_DAYS = 90        # auto-delete inactive data after this many days
+
+# Clean URL routes → HTML files
+PAGE_ROUTES = {
+    "/default":   "index_default.html",
+    "/s01_arc01": "index_s01_arc01.html",
+}
 
 
 def valid_uid(uid):
@@ -274,6 +286,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(content)
 
+        elif self.path.split("?")[0] in PAGE_ROUTES:
+            self._serve_page_route()
+
         else:
             super().do_GET()
 
@@ -412,6 +427,12 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 self._json_response(error_info[0], {"error": error_info[1]})
                 return
 
+            # Validate and fix line references before sending to student
+            if VALIDATOR_ENABLED:
+                code = extract_code_from_messages(body["messages"])
+                if code:
+                    reply = fix_line_refs(reply, code)
+
             # Log final exchange to chat history (only in saving mode)
             if saving:
                 ensure_data_dir()
@@ -507,6 +528,26 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.send_response(404)
             self.send_header("Content-Length", "0")
             self.end_headers()
+
+    def _serve_page_route(self):
+        """Serve an HTML page from the PAGE_ROUTES allowlist only."""
+        route = self.path.split("?")[0]
+        filename = PAGE_ROUTES.get(route)
+        if not filename:
+            self.send_error(404)
+            return
+        base = os.path.dirname(os.path.abspath(__file__))
+        fpath = os.path.join(base, filename)
+        if not os.path.isfile(fpath):
+            self.send_error(404)
+            return
+        with open(fpath, "rb") as f:
+            content = f.read()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html")
+        self.send_header("Content-Length", str(len(content)))
+        self.end_headers()
+        self.wfile.write(content)
 
     def _json_response(self, code, data):
         body = json.dumps(data).encode()
