@@ -29,7 +29,31 @@ id codeprobe &>/dev/null || useradd --system --create-home --home-dir /opt/codep
 echo "==> Permissions"
 mkdir -p /opt/codeprobe/data
 chown -R codeprobe:codeprobe /opt/codeprobe
+touch /opt/codeprobe/.env
 chmod 600 /opt/codeprobe/.env
+
+echo "==> Secrets"
+ensure_secret() {
+    local key="$1"
+    if ! grep -q "^${key}=" /opt/codeprobe/.env 2>/dev/null; then
+        local value
+        value=$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')
+        printf '%s=%s\n' "$key" "$value" >> /opt/codeprobe/.env
+        echo "  generated ${key}"
+    fi
+}
+ensure_secret DASHBOARD_SECRET
+ensure_secret VALIDATOR_HMAC_KEY
+chown codeprobe:codeprobe /opt/codeprobe/.env
+chmod 600 /opt/codeprobe/.env
+
+echo "==> Sign validator model"
+if [ -f /opt/codeprobe/validator_model.pkl ]; then
+    sudo -u codeprobe bash -c '
+        set -a; . /opt/codeprobe/.env; set +a
+        cd /opt/codeprobe && python3 validator.py --sign
+    '
+fi
 
 echo "==> Caddy config (domain: $DOMAIN)"
 cat > /etc/caddy/Caddyfile <<CADDYEOF
