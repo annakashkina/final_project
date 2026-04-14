@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 import http.server
-import hashlib
+import hmac
 import json
 import re
+import secrets
 import threading
 import urllib.request
 import os
@@ -27,7 +28,8 @@ if os.path.exists(env_path):
 LLM_API_KEY = os.environ.get("LLM_API_KEY") or os.environ.get("GROQ_API_KEY", "")
 LLM_MODEL = os.environ.get("LLM_MODEL") or os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b")
 LLM_API_URL = os.environ.get("LLM_API_URL") or os.environ.get("GROQ_URL", "https://api.groq.com/openai/v1/chat/completions")
-DASHBOARD_SECRET = os.environ.get("DASHBOARD_SECRET") or LLM_API_KEY
+DASHBOARD_SECRET = os.environ.get("DASHBOARD_SECRET") or secrets.token_urlsafe(32)
+_DASHBOARD_SECRET_AUTOGEN = not os.environ.get("DASHBOARD_SECRET")
 
 LLM_HEADERS = {"Content-Type": "application/json", "User-Agent": "CodeProbe/1.0"}
 if LLM_API_KEY:
@@ -42,18 +44,34 @@ BOT_UA_RE = re.compile(
     r"|semrush|ahref|mj12|dotbot|bytespider|gptbot|claudebot|ccbot",
     re.IGNORECASE,
 )
-TOKEN_SALT = "codeprobe_2026"
 _UUID_RE = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
+_TOKEN_RE = re.compile(r'^[A-Za-z0-9_-]{32,64}$')
 MAX_BODY = 256 * 1024  # 256KB
+MAX_FEEDBACK_LEN = 5000
+TRUSTED_PROXIES = {"127.0.0.1", "::1"}
 
 # Thread lock for shared file/state access
 _lock = threading.Lock()
 
-# Rate limiting for /api/chat: {ip: [timestamp, ...]}
-_chat_hits = {}
-CHAT_RATE_LIMIT = 60      # max requests
-CHAT_RATE_WINDOW = 3600    # per hour
+# Rate limiting per bucket: {(bucket, ip): [timestamp, ...]}
+_rate_hits = {}
+RATE_LIMITS = {
+    "chat":     (60,  3600),   # 60/hour — LLM spend
+    "event":    (600, 3600),   # 600/hour — analytics
+    "register": (20,  3600),   # 20/hour — token mint
+    "mutate":   (30,  3600),   # 30/hour — delete/export/feedback
+}
 RETENTION_DAYS = 90        # auto-delete inactive data after this many days
+
+STATIC_ALLOWED_EXT = {
+    ".html", ".css", ".js", ".mjs", ".map",
+    ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".webp",
+    ".woff", ".woff2", ".ttf", ".otf",
+    ".txt", ".json",
+}
+STATIC_DENIED_PREFIXES = ("data/", "deploy/", "__pycache__/", ".")
+STATIC_DENIED_SUFFIXES = (".env", ".pkl", ".py", ".jsonl", ".service", ".sh", ".sig")
+STATIC_DENIED_FILES = {"_users.json", ".env", ".env.example", ".token_secret"}
 
 # Clean URL routes → HTML files
 PAGE_ROUTES = {
@@ -70,22 +88,58 @@ def is_bot(ua):
     return bool(BOT_UA_RE.search(ua or ""))
 
 
-def make_token(uid):
-    """Expected token = first 8 chars of sha256(uid + salt)."""
-    return hashlib.sha256((uid + TOKEN_SALT).encode()).hexdigest()[:8]
+def valid_token(tok):
+    return bool(tok) and bool(_TOKEN_RE.match(tok))
 
 
-def check_rate(ip):
-    """Returns True if under limit."""
+def mint_token():
+    return secrets.token_urlsafe(32)
+
+
+def verify_token(uid, presented):
+    """Constant-time token check against the token stored in _users.json.
+    Returns True only if the uid has a stored token and it matches."""
+    if not valid_uid(uid) or not valid_token(presented):
+        return False
+    with _lock:
+        users = load_users()
+        stored = (users.get(uid) or {}).get("token")
+    if not stored:
+        return False
+    return hmac.compare_digest(stored, presented)
+
+
+def register_uid(uid):
+    """Trust-on-first-use: mint a token for a new uid. Returns token, or None
+    if uid already has a token (prevents hijacking a registered account)."""
+    if not valid_uid(uid):
+        return None
+    with _lock:
+        users = load_users()
+        if uid in users and "token" in users[uid]:
+            return None  # already claimed
+        now = int(time.time() * 1000)
+        meta = users.get(uid, {"first_seen": now})
+        meta["token"] = mint_token()
+        meta.setdefault("first_seen", now)
+        users[uid] = meta
+        save_users(users)
+        return meta["token"]
+
+
+def check_rate(bucket, ip):
+    """Returns True if under limit for (bucket, ip)."""
+    limit, window = RATE_LIMITS.get(bucket, (60, 3600))
     with _lock:
         now = time.time()
-        hits = _chat_hits.get(ip, [])
-        hits = [t for t in hits if now - t < CHAT_RATE_WINDOW]
-        if len(hits) >= CHAT_RATE_LIMIT:
-            _chat_hits[ip] = hits
+        key = (bucket, ip)
+        hits = _rate_hits.get(key, [])
+        hits = [t for t in hits if now - t < window]
+        if len(hits) >= limit:
+            _rate_hits[key] = hits
             return False
         hits.append(now)
-        _chat_hits[ip] = hits
+        _rate_hits[key] = hits
         return True
 
 
@@ -116,11 +170,16 @@ def validate_messages(messages):
 
 
 def get_real_ip(handler):
-    """Get client IP, checking X-Forwarded-For for proxied requests (ngrok etc)."""
-    forwarded = handler.headers.get("X-Forwarded-For", "")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return handler.client_address[0]
+    """Client IP. Trust X-Forwarded-For only when direct peer is a trusted proxy
+    (Caddy on localhost). Otherwise the peer IP wins — prevents XFF spoofing."""
+    peer = handler.client_address[0]
+    if peer in TRUSTED_PROXIES:
+        forwarded = handler.headers.get("X-Forwarded-For", "")
+        if forwarded:
+            first = forwarded.split(",")[0].strip()
+            if re.match(r"^[0-9a-fA-F:.]{2,45}$", first):
+                return first
+    return peer
 
 
 def ensure_data_dir():
@@ -179,11 +238,50 @@ def save_users(users):
         json.dump(users, f, indent=2)
 
 
+def _is_static_safe(rel_path):
+    """Allow-list gate for the static file fallthrough. rel_path is the request
+    path stripped of leading '/' and query string; must be a simple relative
+    path (no absolute, no '..', no backslash, no NUL)."""
+    if not rel_path:
+        return True  # index
+    if "\x00" in rel_path or "\\" in rel_path:
+        return False
+    if rel_path.startswith("/") or ".." in rel_path.split("/"):
+        return False
+    lower = rel_path.lower()
+    if any(lower.startswith(p) for p in STATIC_DENIED_PREFIXES):
+        return False
+    basename = lower.rsplit("/", 1)[-1]
+    if basename in STATIC_DENIED_FILES or basename.startswith("."):
+        return False
+    if any(lower.endswith(s) for s in STATIC_DENIED_SUFFIXES):
+        return False
+    ext = os.path.splitext(basename)[1]
+    if ext and ext not in STATIC_ALLOWED_EXT:
+        return False
+    return True
+
+
 class Handler(http.server.SimpleHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
+    def _dashboard_ok(self):
+        """Constant-time check that the path carries the dashboard secret."""
+        # Path form: /dashboard/<secret> OR ?key=<secret>
+        query = self.path.split("?", 1)[1] if "?" in self.path else ""
+        params = dict(p.split("=", 1) for p in query.split("&") if "=" in p)
+        supplied = params.get("key", "")
+        if not supplied and self.path.startswith("/dashboard/"):
+            supplied = self.path.split("/dashboard/", 1)[1].split("?", 1)[0]
+        if not supplied:
+            return False
+        return hmac.compare_digest(supplied, DASHBOARD_SECRET)
+
     def do_GET(self):
-        if self.path == f"/dashboard/{DASHBOARD_SECRET}":
+        if self.path.startswith("/dashboard/"):
+            if not self._dashboard_ok():
+                self._json_response(403, {"error": "forbidden"})
+                return
             dash_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dashboard.html")
             with open(dash_path, "rb") as f:
                 content = f.read()
@@ -194,7 +292,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.wfile.write(content)
 
         elif self.path.startswith("/api/users"):
-            if f"key={DASHBOARD_SECRET}" not in self.path:
+            if not self._dashboard_ok():
                 self._json_response(403, {"error": "forbidden"})
                 return
             qs = self.path.split("?", 1)[1] if "?" in self.path else ""
@@ -231,7 +329,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self._json_response(200, result)
 
         elif self.path.startswith("/api/timeline"):
-            if f"key={DASHBOARD_SECRET}" not in self.path:
+            if not self._dashboard_ok():
                 self._json_response(403, {"error": "forbidden"})
                 return
             qs = self.path.split("?", 1)[1] if "?" in self.path else ""
@@ -254,8 +352,11 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         elif self.path.startswith("/api/export"):
             uid = self.headers.get("X-UID", "")
             token = self.headers.get("X-Token", "")
-            if not uid or not valid_uid(uid) or token != make_token(uid):
+            if not verify_token(uid, token):
                 self._json_response(403, {"error": "forbidden"})
+                return
+            if not check_rate("mutate", get_real_ip(self)):
+                self._json_response(429, {"error": "rate limit exceeded"})
                 return
             ensure_data_dir()
             result = {"uid": uid, "events": [], "chats": []}
@@ -290,6 +391,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self._serve_page_route()
 
         else:
+            rel = self.path.split("?", 1)[0].lstrip("/")
+            if not _is_static_safe(rel):
+                self.send_error(404)
+                return
             super().do_GET()
 
     def do_POST(self):
@@ -304,19 +409,34 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self._json_response(413, {"error": "request too large"})
             return
 
-        # Verify JS proof token on API calls
         uid = self.headers.get("X-UID", "")
         token = self.headers.get("X-Token", "")
-        if self.path.startswith("/api/") and uid:
+
+        # /api/register is unauth'd (TOFU) — handle before token check
+        if self.path == "/api/register":
+            if length:
+                self.rfile.read(length)  # drain body
+            if not check_rate("register", get_real_ip(self)):
+                self._json_response(429, {"error": "rate limit exceeded"})
+                return
             if not valid_uid(uid):
                 self._json_response(400, {"error": "invalid uid"})
                 return
-            if token != make_token(uid):
+            new_tok = register_uid(uid)
+            if not new_tok:
+                self._json_response(409, {"error": "already registered"})
+                return
+            self._json_response(200, {"token": new_tok})
+            return
+
+        # All other /api/* endpoints require a valid token
+        if self.path.startswith("/api/"):
+            if not verify_token(uid, token):
                 self._json_response(403, {"error": "invalid token"})
                 return
 
         if self.path == "/api/chat":
-            if not check_rate(get_real_ip(self)):
+            if not check_rate("chat", get_real_ip(self)):
                 self._json_response(429, {"error": "rate limit exceeded"})
                 return
             try:
@@ -355,11 +475,13 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                     result = json.loads(resp.read())
                     reply = result["choices"][0]["message"]["content"]
             except urllib.error.HTTPError as e:
-                error_info = (e.code, e.read().decode(errors="replace"))
-                print(f"LLM API error {error_info[0]}: {error_info[1]}", file=sys.stderr)
+                try: e.read()
+                except Exception: pass
+                error_info = (e.code, "upstream error")
+                print(f"LLM API error status={e.code}", file=sys.stderr)
             except Exception as e:
-                error_info = (500, str(e))
-                print(f"Error: {e}", file=sys.stderr)
+                error_info = (500, "upstream error")
+                print(f"LLM API error: {type(e).__name__}", file=sys.stderr)
 
             # Retry once if error or too-short reply (~50 tokens ≈ 40 words)
             needs_retry = error_info is not None or (reply is not None and len(reply.split()) < 40)
@@ -416,11 +538,13 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                         error_info = None
                         used_messages = msgs
                 except urllib.error.HTTPError as e:
-                    error_info = (e.code, e.read().decode(errors="replace"))
-                    print(f"LLM retry error {error_info[0]}: {error_info[1]}", file=sys.stderr)
+                    try: e.read()
+                    except Exception: pass
+                    error_info = (e.code, "upstream error")
+                    print(f"LLM retry error status={e.code}", file=sys.stderr)
                 except Exception as e:
-                    error_info = (500, str(e))
-                    print(f"Retry error: {e}", file=sys.stderr)
+                    error_info = (500, "upstream error")
+                    print(f"LLM retry error: {type(e).__name__}", file=sys.stderr)
 
             # Return error if still failing after retry
             if error_info:
@@ -455,6 +579,11 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                     self.rfile.read(length)  # drain body for HTTP/1.1
                 self._json_response(200, {"ok": True})
                 return
+            if not check_rate("event", get_real_ip(self)):
+                if length:
+                    self.rfile.read(length)
+                self._json_response(429, {"error": "rate limit exceeded"})
+                return
 
             body = self.rfile.read(length) if length else b"{}"
             try:
@@ -486,9 +615,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         elif self.path == "/api/delete":
             if length:
                 self.rfile.read(length)  # drain body for HTTP/1.1
-            # Explicit auth check — destructive operation
-            if not uid or not valid_uid(uid) or token != make_token(uid):
-                self._json_response(403, {"error": "forbidden"})
+            # Token already verified by the gate above; also rate-limit.
+            if not check_rate("mutate", get_real_ip(self)):
+                self._json_response(429, {"error": "rate limit exceeded"})
                 return
             ensure_data_dir()
             with _lock:
@@ -503,6 +632,11 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self._json_response(200, {"ok": True})
 
         elif self.path == "/api/feedback":
+            if not check_rate("mutate", get_real_ip(self)):
+                if length:
+                    self.rfile.read(length)
+                self._json_response(429, {"error": "rate limit exceeded"})
+                return
             body = self.rfile.read(length) if length else b"{}"
             try:
                 data = json.loads(body)
@@ -512,6 +646,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             text = data.get("text", "").strip()
             if not text:
                 self._json_response(400, {"error": "text required"})
+                return
+            if len(text) > MAX_FEEDBACK_LEN:
+                self._json_response(413, {"error": "feedback too long"})
                 return
             ensure_data_dir()
             record = {
@@ -554,16 +691,35 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
-        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(body)
 
+    def end_headers(self):
+        # Security headers on every response (safe on JSON + HTML + static)
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Referrer-Policy", "strict-origin-when-cross-origin")
+        self.send_header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+        path_only = self.path.split("?", 1)[0]
+        if path_only.endswith(".html") or "." not in path_only.rsplit("/", 1)[-1] or path_only.startswith("/dashboard") or path_only == "/privacy":
+            self.send_header(
+                "Content-Security-Policy",
+                "default-src 'self'; "
+                "script-src 'self'; "
+                "style-src 'self' 'unsafe-inline'; "
+                "img-src 'self' data:; "
+                "font-src 'self' data:; "
+                "connect-src 'self'; "
+                "frame-ancestors 'none'; "
+                "base-uri 'self'",
+            )
+        super().end_headers()
+
     def do_OPTIONS(self):
-        self.send_response(200)
+        # Same-origin only — no CORS needed; respond minimal
+        self.send_response(204)
         self.send_header("Content-Length", "0")
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, X-UID, X-Token, X-Mode")
         self.end_headers()
 
     def log_message(self, fmt, *args):
@@ -576,7 +732,16 @@ if __name__ == "__main__":
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 3000
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
     print(f"codeprobe at http://localhost:{port}")
-    print(f"Dashboard at http://localhost:{port}/dashboard/{DASHBOARD_SECRET}")
+    if _DASHBOARD_SECRET_AUTOGEN:
+        print(
+            "WARNING: DASHBOARD_SECRET env var not set — generated an ephemeral "
+            "random secret. Set DASHBOARD_SECRET to a persistent value in production.",
+            file=sys.stderr,
+        )
+        print(f"Dashboard at http://localhost:{port}/dashboard/{DASHBOARD_SECRET}")
+    else:
+        preview = DASHBOARD_SECRET[:4] + "…" if len(DASHBOARD_SECRET) > 4 else "…"
+        print(f"Dashboard at http://localhost:{port}/dashboard/<DASHBOARD_SECRET={preview}>")
     print(f"Using model: {LLM_MODEL}")
     print(f"API: {LLM_API_URL}")
     schedule_cleanup()

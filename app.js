@@ -23,22 +23,43 @@ function getUID() {
   return _sessionUID;
 }
 
-// JS proof token — sha256(uid + salt), first 8 hex chars
-async function makeToken(uid) {
-  const data = new TextEncoder().encode(uid + "codeprobe_2026");
-  const hash = await crypto.subtle.digest("SHA-256", data);
-  return [...new Uint8Array(hash)].map(b => b.toString(16).padStart(2, "0")).join("").slice(0, 8);
+// Server-issued random token — TOFU per UID. Stored in localStorage for
+// persistent users, in memory for ephemeral.
+let _memToken = null;
+
+function getToken() {
+  return localStorage.getItem("codeprobe_token") || _memToken;
 }
 
-let _tokenPromise = makeToken(getUID());
+function storeToken(tok) {
+  if (localStorage.getItem("codeprobe_uid")) {
+    localStorage.setItem("codeprobe_token", tok);
+  } else {
+    _memToken = tok;
+  }
+}
 
-function apiHeaders() {
-  return _tokenPromise.then(token => ({
+async function ensureToken() {
+  let tok = getToken();
+  if (tok) return tok;
+  const resp = await fetch("/api/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "X-UID": getUID() },
+  });
+  if (!resp.ok) throw new Error("register failed: " + resp.status);
+  const data = await resp.json();
+  storeToken(data.token);
+  return data.token;
+}
+
+async function apiHeaders() {
+  const token = await ensureToken();
+  return {
     "Content-Type": "application/json",
     "X-UID": getUID(),
     "X-Token": token,
     "X-Mode": isSaving() ? "saving" : "private",
-  }));
+  };
 }
 
 // Analytics — fire-and-forget, only when saving
@@ -46,6 +67,12 @@ function track(type, data = {}) {
   if (!isSaving()) return;
   const body = JSON.stringify({ type, ...data, ts: Date.now() });
   apiHeaders().then(h => fetch("/api/event", { method: "POST", headers: h, body })).catch(() => {});
+}
+
+// Escape text for safe insertion via innerHTML
+function escHTML(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;")
+                  .replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
 // Identify: send page_load (only when saving, no more IP/UA matching)
@@ -425,7 +452,7 @@ function renderCode(idx) {
 function renderSeeds() {
   const el = $("#seed-questions");
   const seeds = state.lesson.seedQuestions
-    .map(q => `<span class="seed">${q}</span>`).join("");
+    .map(q => `<span class="seed">${escHTML(q)}</span>`).join("");
   el.innerHTML =
     `<span class="seed seed-go">Let's just learn this stuff!</span>` +
     `<span class="seed-toggle">what to ask <span class="seed-arrow">&#9662;</span></span>` +
@@ -529,6 +556,8 @@ function fmt(t) {
   const ph = (s) => { holds.push(s); return `\x00${holds.length - 1}\x00`; };
   t = t.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, _l, code) => ph(`<pre><code>${esc(code)}</code></pre>`));
   t = t.replace(/`([^`]+)`/g, (_, code) => ph(`<code>${esc(code)}</code>`));
+  // Escape everything outside code/pre placeholders, then reintroduce bold
+  t = esc(t);
   t = t.replace(/\*\*([\s\S]+?)\*\*/g, "<strong>$1</strong>");
   t = t.replace(/\n/g, "<br>");
   t = t.replace(/\x00(\d+)\x00/g, (_, i) => holds[i]);

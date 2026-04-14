@@ -40,8 +40,20 @@ $DOMAIN {
         X-Content-Type-Options nosniff
         X-Frame-Options DENY
         Referrer-Policy strict-origin-when-cross-origin
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
         -Server
     }
+
+    # Defense-in-depth: block access to server-side files even if the
+    # Python handler regresses. Paths that must never be served publicly.
+    @forbidden {
+        path /.env /.env.* /.token_secret
+        path /data /data/*
+        path /deploy /deploy/*
+        path /__pycache__/*
+        path *.py *.pkl *.pkl.sig *.jsonl *.service *.sh
+    }
+    respond @forbidden 404
 
     reverse_proxy localhost:3000
 }
