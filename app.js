@@ -290,7 +290,7 @@ function buildPrompt(lesson, questions) {
   const isQuick = state.mode === "quick";
 
   const approach = isQuick
-    ? `Your job is to QUIZ the student, not lecture them. Address their question briefly (1-2 sentences)${bridgeNote}, then immediately ask ONE quiz question about the code. The student learns by attempting the question, not by reading an explanation.
+    ? `Your job is to QUIZ the student, not lecture them. Address their question briefly (1-2 sentences, but if you see clear curiosity - no limits)${bridgeNote}, then immediately ask ONE quiz question about the code. The student learns by attempting the question, not by reading an explanation.
 
 After they answer:
 - If correct: brief feedback, 1-sentence summary, end with [LESSON_COMPLETE].
@@ -298,7 +298,7 @@ After they answer:
 CRITICAL: Never use [LESSON_COMPLETE] in the same response where you corrected the student.
 
 RULES: Be conversational. ONE question only. Use backtick code snippets. Reference specific lines. ~1-2 total exchanges. Only reference languages the student knows — do NOT assume knowledge of languages not listed.${levelNote}`
-    : `Your job is to QUIZ the student, not lecture them. Address their question briefly (1-2 sentences)${bridgeNote}, then immediately ask ONE quiz question about the code. The student learns by attempting the question, not by reading an explanation.
+    : `Your job is to QUIZ the student, not lecture them. Address their question briefly (1-2 sentences, but if you see clear curiosity - no limits)${bridgeNote}, then immediately ask ONE quiz question about the code. The student learns by attempting the question, not by reading an explanation.
 
 After they answer:
 - If correct AND it's been 4-5 exchanges: brief feedback, summarize what they learned in 2-3 sentences, end with [LESSON_COMPLETE].
@@ -329,7 +329,6 @@ STUDENT QUESTIONS: ${questions || "(none — start with the most important conce
 // Demo response always working for c-pointers: lesson with "What does &x give you?"
 function getDemoResponse() {
   if (!state.lesson || state.lesson.id !== "c-pointers") return null;
-  if (state.mode !== "quick") return null;
 
   const msgs = state.messages;
 
@@ -454,8 +453,8 @@ function renderSeeds() {
   const seeds = state.lesson.seedQuestions
     .map(q => `<span class="seed">${escHTML(q)}</span>`).join("");
   el.innerHTML =
-    `<span class="seed seed-go">Let's just learn this stuff!</span>` +
-    `<span class="seed-toggle">what to ask <span class="seed-arrow">&#9662;</span></span>` +
+    `<span class="seed seed-go">start learning</span>` +
+    `<span class="seed-toggle">example questions <span class="seed-arrow">&#9662;</span></span>` +
     `<div class="seed-drawer hidden">${seeds}</div>`;
   el.querySelector(".seed-go").addEventListener("click", () => {
     track("seed_click", { text: "lets_learn" });
@@ -470,19 +469,22 @@ function renderSeeds() {
   el.querySelectorAll(".seed-drawer .seed").forEach(s =>
     s.addEventListener("click", () => {
       const ta = $("#user-questions");
+      const body = $("#explore-optional-body");
+      if (body) body.classList.remove("hidden");
       ta.value = ta.value ? ta.value + "\n" + s.textContent : s.textContent;
       ta.focus();
       track("seed_click", { text: s.textContent });
-      syncStartButtons();
     })
   );
-  syncStartButtons();
-}
-
-function syncStartButtons() {
-  const hasText = $("#user-questions").value.trim().length > 0;
-  $(".seed-go").style.display = hasText ? "none" : "";
-  $("#start-btn").style.display = hasText ? "" : "none";
+  const optToggle = $("#explore-optional-toggle");
+  if (optToggle) {
+    optToggle.onclick = () => {
+      const body = $("#explore-optional-body");
+      const arrow = optToggle.querySelector(".seed-arrow");
+      body.classList.toggle("hidden");
+      arrow.textContent = body.classList.contains("hidden") ? "\u25BE" : "\u25B4";
+    };
+  }
 }
 
 // Phases
@@ -727,8 +729,6 @@ $("#back-btn").addEventListener("click", () => {
   clearSession();
   navigate(null);
 });
-$("#start-btn").addEventListener("click", startLearning);
-$("#user-questions").addEventListener("input", syncStartButtons);
 $$("#mode-toggle .mode-opt").forEach(btn => {
   btn.addEventListener("click", () => {
     state.mode = btn.dataset.mode;

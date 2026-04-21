@@ -23,13 +23,36 @@ if os.path.exists(env_path):
         line = line.strip()
         if line and not line.startswith("#") and "=" in line:
             k, v = line.split("=", 1)
-            os.environ.setdefault(k.strip(), v.strip())
+            os.environ[k.strip()] = v.strip()
 
 LLM_API_KEY = os.environ.get("LLM_API_KEY") or os.environ.get("GROQ_API_KEY", "")
 LLM_MODEL = os.environ.get("LLM_MODEL") or os.environ.get("GROQ_MODEL", "openai/gpt-oss-120b")
 LLM_API_URL = os.environ.get("LLM_API_URL") or os.environ.get("GROQ_URL", "https://api.groq.com/openai/v1/chat/completions")
 DASHBOARD_SECRET = os.environ.get("DASHBOARD_SECRET") or secrets.token_urlsafe(32)
 _DASHBOARD_SECRET_AUTOGEN = not os.environ.get("DASHBOARD_SECRET")
+
+# Unsloth Studio: if UNSLOTH_PASSWORD is set, authenticate at startup to get a JWT,
+# then use it as the bearer token for the /v1/chat/completions endpoint.
+UNSLOTH_PASSWORD = os.environ.get("UNSLOTH_PASSWORD", "")
+UNSLOTH_USER = os.environ.get("UNSLOTH_USER", "unsloth")
+
+def _unsloth_auth():
+    """Authenticate with Unsloth Studio and return a JWT access token."""
+    base = LLM_API_URL.rsplit("/v1", 1)[0]
+    payload = json.dumps({"username": UNSLOTH_USER, "password": UNSLOTH_PASSWORD}).encode()
+    req = urllib.request.Request(base + "/api/auth/login", data=payload,
+                                headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=20) as resp:
+        data = json.loads(resp.read())
+    return data.get("access_token") or data.get("token", "")
+
+if UNSLOTH_PASSWORD:
+    try:
+        LLM_API_KEY = _unsloth_auth()
+        LLM_MODEL = "active-model"
+        print(f"Unsloth: authenticated, model={LLM_MODEL}", file=sys.stderr)
+    except Exception as e:
+        print(f"Unsloth auth failed: {e}", file=sys.stderr)
 
 LLM_HEADERS = {"Content-Type": "application/json", "User-Agent": "CodeProbe/1.0"}
 if LLM_API_KEY:
@@ -75,8 +98,9 @@ STATIC_DENIED_FILES = {"_users.json", ".env", ".env.example", ".token_secret"}
 
 # Clean URL routes → HTML files
 PAGE_ROUTES = {
-    "/default":   "index_default.html",
-    "/s01_arc01": "index_s01_arc01.html",
+    "/default":    "index_default.html",
+    "/s01_arc01":  "index_s01_arc01.html",
+    "/onboarding": "index_meta.html",
 }
 
 
@@ -454,11 +478,21 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
             saving = self.headers.get("X-Mode", "") == "saving"
 
+            msgs = body["messages"]
+            if UNSLOTH_PASSWORD and len(msgs) == 1 and msgs[0]["role"] == "system":
+                msgs = msgs + [{"role": "user", "content": "Begin."}]
+
+            llm_extra = {}
+            if UNSLOTH_PASSWORD:
+                llm_extra["enable_thinking"] = False
+
             payload = json.dumps({
                 "model": LLM_MODEL,
-                "messages": body["messages"],
+                "messages": msgs,
                 "temperature": 0.7,
                 "max_tokens": 1500,
+                "stream": False,
+                **llm_extra,
             }).encode()
 
             req = urllib.request.Request(
@@ -475,10 +509,12 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                     result = json.loads(resp.read())
                     reply = result["choices"][0]["message"]["content"]
             except urllib.error.HTTPError as e:
-                try: e.read()
-                except Exception: pass
+                try:
+                    body = e.read().decode(errors="replace")
+                    print(f"LLM API error status={e.code} body={body[:500]}", file=sys.stderr)
+                except Exception:
+                    print(f"LLM API error status={e.code}", file=sys.stderr)
                 error_info = (e.code, "upstream error")
-                print(f"LLM API error status={e.code}", file=sys.stderr)
             except Exception as e:
                 error_info = (500, "upstream error")
                 print(f"LLM API error: {type(e).__name__}", file=sys.stderr)
@@ -517,6 +553,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 # Retry after 1s with trailing space on last message to avoid caching
                 time.sleep(1)
                 msgs = [dict(m) for m in body["messages"]]
+                if UNSLOTH_PASSWORD and len(msgs) == 1 and msgs[0]["role"] == "system":
+                    msgs.append({"role": "user", "content": "Begin."})
                 if msgs:
                     msgs[-1]["content"] += " "
 
@@ -525,6 +563,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                     "messages": msgs,
                     "temperature": 0.7,
                     "max_tokens": 1500,
+                    "stream": False,
+                    **llm_extra,
                 }).encode()
                 retry_req = urllib.request.Request(
                     LLM_API_URL,
@@ -538,13 +578,15 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                         error_info = None
                         used_messages = msgs
                 except urllib.error.HTTPError as e:
-                    try: e.read()
-                    except Exception: pass
+                    try:
+                        body = e.read().decode(errors="replace")
+                        print(f"LLM retry error status={e.code} body={body[:500]}", file=sys.stderr)
+                    except Exception:
+                        print(f"LLM retry error status={e.code}", file=sys.stderr)
                     error_info = (e.code, "upstream error")
-                    print(f"LLM retry error status={e.code}", file=sys.stderr)
                 except Exception as e:
                     error_info = (500, "upstream error")
-                    print(f"LLM retry error: {type(e).__name__}", file=sys.stderr)
+                    print(f"LLM retry error: {type(e).__name__}: {e}", file=sys.stderr)
 
             # Return error if still failing after retry
             if error_info:

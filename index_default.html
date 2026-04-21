@@ -6,7 +6,7 @@
   <meta name="codeprobe-lessons" content="./lessons.js">
   <title>codeprobe</title>
   <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="style.css?v=7">
+  <link rel="stylesheet" href="style.css?v=8">
   <link id="hljs-light" rel="stylesheet"
         href="vendor/highlight.js/styles/github.min.css">
   <link id="hljs-dark" rel="stylesheet" disabled
@@ -91,44 +91,51 @@
 
         <!-- Explore -->
         <div id="phase-explore" class="phase-content">
-          <div class="explore-intro">
-            <p><strong>Read the code on the left.</strong> Then write down what you'd like to understand about it.</p>
-            <p class="small dim">Don't worry about getting it right &mdash; just write what catches your eye or confuses you.</p>
-          </div>
-          <div id="seed-questions" class="seeds"></div>
-          <textarea id="user-questions"
-                    placeholder="Your questions about this code...&#10;&#10;Or hit &quot;Let's just learn this stuff!&quot; and start immediately!"
-                    rows="4"></textarea>
-          <div class="actions">
-            <select id="lang-select">
-              <option value="en">English</option>
-              <option value="es">Espanol</option>
-              <option value="fr">Francais</option>
-              <option value="de">Deutsch</option>
-              <option value="it">Italiano</option>
-              <option value="pt">Portugues</option>
-              <option value="ru">Русский</option>
-              <option value="zh">中文</option>
-              <option value="ja">日本語</option>
-              <option value="ko">한국어</option>
-              <option value="ar">العربية</option>
-              <option value="hi">हिन्दी</option>
-              <option value="tr">Turkce</option>
-              <option value="nl">Nederlands</option>
-              <option value="pl">Polski</option>
-              <option value="uk">Українська</option>
-              <option value="vi">Tieng Viet</option>
-              <option value="th">ไทย</option>
-              <option value="et">Eesti</option>
-              <option value="lv">Latviešu</option>
-              <option value="lt">Lietuviu</option>
-            </select>
-            <div id="mode-toggle" class="mode-toggle">
-              <button class="mode-opt active" data-mode="quick">quick</button>
-              <button class="mode-opt" data-mode="full">extended</button>
+          <div class="explore-hero">
+            <div id="seed-questions" class="seeds"></div>
+            <div class="explore-settings">
+              <select id="lang-select">
+                <option value="en">English</option>
+                <option value="es">Espanol</option>
+                <option value="fr">Francais</option>
+                <option value="de">Deutsch</option>
+                <option value="it">Italiano</option>
+                <option value="pt">Portugues</option>
+                <option value="ru">Русский</option>
+                <option value="zh">中文</option>
+                <option value="ja">日本語</option>
+                <option value="ko">한국어</option>
+                <option value="ar">العربية</option>
+                <option value="hi">हिन्दी</option>
+                <option value="tr">Turkce</option>
+                <option value="nl">Nederlands</option>
+                <option value="pl">Polski</option>
+                <option value="uk">Українська</option>
+                <option value="vi">Tieng Viet</option>
+                <option value="th">ไทย</option>
+                <option value="et">Eesti</option>
+                <option value="lv">Latviešu</option>
+                <option value="lt">Lietuviu</option>
+              </select>
+              <div id="mode-toggle" class="mode-toggle">
+                <button class="mode-opt active" data-mode="quick">quick</button>
+                <button class="mode-opt" data-mode="full">extended</button>
+              </div>
             </div>
-            <button id="start-btn" class="btn-primary">start learning</button>
-            <button id="copy-prompt-btn" class="btn-secondary">copy</button>
+          </div>
+          <div class="explore-optional">
+            <div class="explore-optional-toggle" id="explore-optional-toggle">
+              or guide the tutor with your own questions <span class="seed-arrow">&#9662;</span>
+            </div>
+            <div id="explore-optional-body" class="explore-optional-body hidden">
+              <p class="small dim" style="padding:0 14px 6px">Read the code on the left, write what catches your eye or confuses you.</p>
+              <textarea id="user-questions"
+                        placeholder="Your questions about this code..."
+                        rows="3"></textarea>
+              <div class="actions">
+                <button id="copy-prompt-btn" class="btn-secondary hidden">copy</button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -154,6 +161,6 @@
   </main>
 
   <div id="toast" class="toast hidden"></div>
-  <script type="module" src="app.js?v=9"></script>
+  <script type="module" src="app.js?v=11"></script>
 </body>
 </html>
