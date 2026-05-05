@@ -1,3 +1,6 @@
+/* @codeprobe-track
+{"title": "codeprobe \u2014 onboarding", "section": "Onboarding", "order": 1, "icon": "\ud83d\udd27", "name": "How codeprobe works", "description": "Learn the codeprobe codebase itself \u2014 the server, auth model, prompt engineering, privacy architecture, deployment, and the ML line-reference validator.", "meta": ["22 lessons", "7 series"]}
+*/
 import { overviewLessons, metaLessons } from "./lessons/meta.js?v=3";
 import { mlLessons } from "./lessons/ml.js?v=3";
 

@@ -50,21 +50,6 @@
       font-weight: 600;
       font-size: 15px;
     }
-    .track-badge {
-      font-size: 11px;
-      padding: 1px 7px;
-      border-radius: 10px;
-      font-weight: 600;
-      margin-left: auto;
-    }
-    .badge-popular {
-      background: var(--accent);
-      color: #fff;
-    }
-    .badge-new {
-      background: var(--green);
-      color: #fff;
-    }
     .track-desc {
       font-size: 13px;
       color: var(--dim);
@@ -103,54 +88,7 @@
     <div class="landing-title">Learn through real code</div>
     <div class="landing-sub">pick a track: read code, get quizzed by an AI tutor, build understanding</div>
 
-    <div class="section-label">Onboarding</div>
-    <div class="track-grid">
-      <a class="track-card" href="/onboarding">
-        <div class="track-card-head">
-          <span class="track-icon">&#128736;</span>
-          <span class="track-name">How codeprobe works</span>
-        </div>
-        <div class="track-desc">
-          Learn the codeprobe codebase itself &mdash; the server, auth model, prompt engineering, privacy architecture, deployment, and the ML line-reference validator.
-        </div>
-        <div class="track-meta">
-          <span>22 lessons</span>
-          <span>7 series</span>
-        </div>
-      </a>
-    </div>
-
-    <div class="section-label">Programming concepts</div>
-    <div class="track-grid">
-      <a class="track-card" href="/default">
-        <div class="track-card-head">
-          <span class="track-icon">&#128187;</span>
-          <span class="track-name">Language Concepts</span>
-        </div>
-        <div class="track-desc">
-          C, Rust, Python, TypeScript, Ruby, C++ &mdash; learn programming concepts through real code snippets across languages.
-        </div>
-        <div class="track-meta">
-          <span>Multiple languages</span>
-          <span>Beginner &rarr; Advanced</span>
-        </div>
-      </a>
-
-      <a class="track-card" href="/s01_arc01">
-        <div class="track-card-head">
-          <span class="track-icon">&#9881;</span>
-          <span class="track-name">C Fundamentals</span>
-        </div>
-        <div class="track-desc">
-          Variables, pointers, strings, structs, malloc, file I/O, Makefiles, and building printf from scratch.
-        </div>
-        <div class="track-meta">
-          <span>23 lessons</span>
-          <span>7 series</span>
-          <span>Beginner &rarr; Advanced</span>
-        </div>
-      </a>
-    </div>
+{{TRACKS}}
   </div>
 
   <script src="./theme-toggle.js" defer></script>

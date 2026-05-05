@@ -1,3 +1,6 @@
+/* @codeprobe-track
+{"title": "codeprobe", "section": "Programming concepts", "order": 10, "icon": "\ud83d\udcbb", "name": "Language Concepts", "description": "C, Rust, Python, TypeScript, Ruby, C++ \u2014 learn programming concepts through real code snippets across languages.", "meta": ["Multiple languages", "Beginner \u2192 Advanced"]}
+*/
 import { cLessons } from "./lessons/c.js";
 import { rustLessons } from "./lessons/rust.js";
 import { pythonLessons } from "./lessons/python.js";

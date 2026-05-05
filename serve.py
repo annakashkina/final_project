@@ -2,6 +2,8 @@
 import http.server
 import hmac
 import json
+import glob
+import html
 import re
 import secrets
 import threading
@@ -96,12 +98,79 @@ STATIC_DENIED_PREFIXES = ("data/", "deploy/", "__pycache__/", ".")
 STATIC_DENIED_SUFFIXES = (".env", ".pkl", ".py", ".jsonl", ".service", ".sh", ".sig")
 STATIC_DENIED_FILES = {"_users.json", ".env", ".env.example", ".token_secret"}
 
-# Clean URL routes → HTML files
-PAGE_ROUTES = {
-    "/default":    "index_default.html",
-    "/s01_arc01":  "index_s01_arc01.html",
-    "/onboarding": "index_meta.html",
-}
+_TRACK_RE = re.compile(r'/\*\s*@codeprobe-track\s*\n(.*?)\*/', re.DOTALL)
+
+def _discover_tracks():
+    """Scan lessons*.js for @codeprobe-track metadata, generate pages in memory."""
+    base = os.path.dirname(os.path.abspath(__file__))
+    track_tpl = os.path.join(base, "_track.html")
+    landing_tpl = os.path.join(base, "_landing.html")
+    with open(track_tpl) as f:
+        track_html = f.read()
+    with open(landing_tpl) as f:
+        landing_html = f.read()
+
+    pages = {}
+    tracks = []
+
+    for path in sorted(glob.glob(os.path.join(base, "lessons*.js"))):
+        fname = os.path.basename(path)
+        # lessons.js → "default", lessons_foo.js → "foo"
+        if fname == "lessons.js":
+            route = "default"
+        else:
+            route = fname.removeprefix("lessons_").removesuffix(".js")
+
+        with open(path) as f:
+            content = f.read()
+
+        meta = {}
+        m = _TRACK_RE.search(content)
+        if m:
+            try:
+                meta = json.loads(m.group(1).strip())
+            except json.JSONDecodeError:
+                print(f"WARNING: bad @codeprobe-track JSON in {fname}", file=sys.stderr)
+
+        title = meta.get("title", "codeprobe")
+        page = track_html.replace("{{LESSONS_SRC}}", f"./{fname}").replace("{{TITLE}}", html.escape(title))
+        pages[f"/{route}"] = page.encode()
+
+        if "section" in meta:
+            tracks.append({"route": route, **meta})
+
+    tracks.sort(key=lambda t: t.get("order", 999))
+
+    # Group by section, preserving first-seen order
+    sections = {}
+    for t in tracks:
+        sections.setdefault(t["section"], []).append(t)
+
+    cards_html = []
+    for section, items in sections.items():
+        cards_html.append(f'    <div class="section-label">{html.escape(section)}</div>')
+        cards_html.append('    <div class="track-grid">')
+        for t in items:
+            icon = html.escape(t.get("icon", ""))
+            name = html.escape(t.get("name", t["route"]))
+            desc = html.escape(t.get("description", ""))
+            meta_spans = "".join(f"<span>{html.escape(m)}</span>" for m in t.get("meta", []))
+            cards_html.append(
+                f'      <a class="track-card" href="/{html.escape(t["route"])}">\n'
+                f'        <div class="track-card-head">\n'
+                f'          <span class="track-icon">{icon}</span>\n'
+                f'          <span class="track-name">{name}</span>\n'
+                f'        </div>\n'
+                f'        <div class="track-desc">{desc}</div>\n'
+                f'        <div class="track-meta">{meta_spans}</div>\n'
+                f'      </a>'
+            )
+        cards_html.append('    </div>')
+
+    pages["/"] = landing_html.replace("{{TRACKS}}", "\n".join(cards_html)).encode()
+    return pages
+
+_PAGES = _discover_tracks()
 
 
 def valid_uid(uid):
@@ -411,7 +480,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(content)
 
-        elif self.path.split("?")[0] in PAGE_ROUTES:
+        elif self.path.split("?")[0] in _PAGES:
             self._serve_page_route()
 
         else:
@@ -709,19 +778,12 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
 
     def _serve_page_route(self):
-        """Serve an HTML page from the PAGE_ROUTES allowlist only."""
+        """Serve a generated HTML page from memory."""
         route = self.path.split("?")[0]
-        filename = PAGE_ROUTES.get(route)
-        if not filename:
+        content = _PAGES.get(route)
+        if not content:
             self.send_error(404)
             return
-        base = os.path.dirname(os.path.abspath(__file__))
-        fpath = os.path.join(base, filename)
-        if not os.path.isfile(fpath):
-            self.send_error(404)
-            return
-        with open(fpath, "rb") as f:
-            content = f.read()
         self.send_response(200)
         self.send_header("Content-Type", "text/html")
         self.send_header("Content-Length", str(len(content)))
