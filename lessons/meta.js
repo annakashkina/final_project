@@ -1252,11 +1252,11 @@ if saving:
     difficulty: "Project",
     icon: "📊",
     description:
-      "Completion tracking with spaced repetition, 'I've worked with' chips that steer the AI tutor, and full GDPR controls — export and delete, all without accounts.",
+      "Completion tracking with spaced repetition, 'I already know' chips that steer the AI tutor, and full GDPR controls — export and delete, all without accounts.",
     concepts: [
       "Completion tracking: count, first seen, last seen per lesson",
       "Spaced repetition: 'revisit' badge after 1+ day, up to 3 completions",
-      "'I've worked with' chips persist regardless of privacy mode — they're functional",
+      "'I already know' chips persist regardless of privacy mode — they're functional",
       "GDPR: /api/export downloads all data, /api/delete removes everything",
     ],
     bridges: {
@@ -1283,7 +1283,7 @@ function shouldRevisit(id) {
   return daysSinceLast >= 1 && p.completed < 3;
 }
 
-// "I've worked with" chips always persist — they're functional, not tracking.
+// "I already know" chips always persist — they're functional, not tracking.
 // getKnownLangs() feeds into buildPrompt() to filter bridges.
 const LANG_CHIPS = [
   "Python", "JavaScript", "Java", "C", "C++",
@@ -1314,7 +1314,7 @@ async function deleteEverything() {
       },
     ],
     seedQuestions: [
-      "Why do 'I've worked with' chips persist even in ephemeral mode?",
+      "Why do 'I already know' chips persist even in ephemeral mode?",
       "How does spaced repetition improve retention compared to doing a lesson once?",
       "What exactly gets exported when you click 'export'?",
       "Why remove individual localStorage keys instead of calling localStorage.clear()?",
