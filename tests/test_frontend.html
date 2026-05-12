@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>codeprobe frontend tests</title>
+  <style>
+    body { font-family: "SF Mono", "Fira Code", Menlo, monospace; font-size: 14px; padding: 20px; background: #1a1a1a; color: #ddd; }
+    .pass { color: #5cb85c; }
+    .fail { color: #d9534f; }
+    pre { margin: 0; white-space: pre-wrap; }
+    h1 { font-size: 18px; margin-bottom: 16px; }
+    #summary { margin-top: 16px; padding: 12px; border-radius: 6px; font-weight: bold; }
+    #summary.ok { background: #1a3d1a; }
+    #summary.bad { background: #3d1a1a; }
+  </style>
+</head>
+<body>
+  <h1>codeprobe frontend tests</h1>
+  <pre id="output"></pre>
+  <div id="summary"></div>
+  <script src="test_frontend.js"></script>
+  <script>
+    const r = window._testReport();
+    const out = document.getElementById("output");
+    for (const line of r.text.split("\n")) {
+      const span = document.createElement("span");
+      span.className = line.includes("\u2717") ? "fail" : line.includes("\u2713") ? "pass" : "";
+      span.textContent = line + "\n";
+      out.appendChild(span);
+    }
+    const summary = document.getElementById("summary");
+    summary.textContent = `${r.passed} passed, ${r.failed} failed`;
+    summary.className = r.failed === 0 ? "ok" : "bad";
+  </script>
+</body>
+</html>
