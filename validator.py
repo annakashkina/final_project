@@ -18,6 +18,8 @@ import re
 import sys
 from collections import Counter
 
+import numpy as np
+
 # ── Model loading ────────────────────────────────────────────────────────
 
 _model_data = None
@@ -358,8 +360,6 @@ def fix_line_refs(reply, code):
     refs = _extract_refs(reply)
     if not refs:
         return reply
-
-    import numpy as np
 
     corrections = []
     for ref in reversed(refs):

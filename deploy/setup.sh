@@ -23,6 +23,10 @@ curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmo
 curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' | tee /etc/apt/sources.list.d/caddy-stable.list
 apt update && apt install -y caddy
 
+echo "==> Install Python ML dependencies"
+apt install -y python3-pip
+pip3 install --break-system-packages numpy scikit-learn
+
 echo "==> Create app user"
 id codeprobe &>/dev/null || useradd --system --create-home --home-dir /opt/codeprobe --shell /usr/sbin/nologin codeprobe
 
