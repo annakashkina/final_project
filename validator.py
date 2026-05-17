@@ -169,12 +169,13 @@ def _backtick_spans(text):
 def _extract_identifiers(text):
     ids = set()
     for span in re.findall(r"`([^`]+)`", text):
-        ids.update(re.findall(r"[a-zA-Z_]\w*", span))
+        for tok in re.findall(r"[a-zA-Z_]\w*", span):
+            if tok.lower() not in _STOPWORDS and tok.lower() not in _CODE_KEYWORDS:
+                ids.add(tok)
     for tok in re.findall(r"\b[a-z_]\w*\b", text):
-        if len(tok) > 2:
+        if len(tok) > 2 and tok.lower() not in _STOPWORDS and tok.lower() not in _CODE_KEYWORDS:
             ids.add(tok)
-    return {t for t in ids if t.lower() not in _STOPWORDS
-            and t.lower() not in _CODE_KEYWORDS and len(t) > 1}
+    return ids
 
 
 # ── TF-IDF helpers ──────────────────────────────────────────────────────
@@ -246,17 +247,18 @@ def _extract_features(ref, code_lines, full_response):
     ref_block = " ".join(code_lines[start - 1:end])
     backtick_ref = 1 if any(s in ref_block for s in spans if len(s) > 2) else 0
 
-    backtick_char_overlap = 0.0
+    backtick_full_overlap = 0.0
+    backtick_token_overlap = 0.0
     for span in spans:
         if len(span) > 2:
             if span.lower().strip() in ref_block.lower():
-                backtick_char_overlap = max(backtick_char_overlap, 1.0)
+                backtick_full_overlap = 1.0
             else:
                 span_toks = set(re.findall(r"[a-zA-Z_]\w*", span))
                 ref_toks = set(re.findall(r"[a-zA-Z_]\w*", ref_block))
                 if span_toks:
-                    backtick_char_overlap = max(backtick_char_overlap,
-                                                len(span_toks & ref_toks) / len(span_toks))
+                    backtick_token_overlap = max(backtick_token_overlap,
+                                                 len(span_toks & ref_toks) / len(span_toks))
 
     # Code block proximity
     code_block_near = 0
@@ -317,7 +319,7 @@ def _extract_features(ref, code_lines, full_response):
     features = [
         start, total, relative_position, is_range, range_size, len(context),
         ref_blank, ref_comment, ref_code_len, ref_indent, ref_has_brace,
-        backtick_ref, backtick_count, backtick_char_overlap,
+        backtick_ref, backtick_count, backtick_full_overlap, backtick_token_overlap,
         code_block_near,
         ref_score, best_score, id_ratio, best_distance, id_count, id_unique,
         neighbor_max, neighbor_better, best_neighbor_dist,
@@ -384,8 +386,8 @@ def fix_line_refs(reply, code):
         else:
             p_wrong = 1.0 if model.predict(X)[0] == 0 else 0.0
 
-        if p_wrong < 0.5:
-            continue  # model thinks it's likely correct → leave it
+        if p_wrong < 0.3:
+            continue  # model is confident it's correct → skip
 
         # Model flagged it as likely wrong. Now find a safe correction
         # using heuristic evidence (not just the model).
@@ -455,5 +457,9 @@ def extract_code_from_messages(messages):
         if m.get("role") == "system":
             match = re.search(r"```\n(.*?)\n```", m.get("content", ""), re.DOTALL)
             if match:
-                return match.group(1)
+                code = match.group(1)
+                lines = code.split("\n")
+                while lines and re.match(r"^---\s+.+\s+---$", lines[0]):
+                    lines.pop(0)
+                return "\n".join(lines)
     return ""
