@@ -83,15 +83,16 @@ FEEDBACK: [one brief encouraging sentence]`,
   const resp = await fetch("/api/chat", {
     method: "POST",
     headers: h,
-    body: JSON.stringify({ messages }),
+    body: JSON.stringify({ messages, expect_short: true }),
   });
-  if (!resp.ok) return { score: null, feedback: "Grading unavailable — your answer was recorded.", raw: null };
+  if (!resp.ok) return { score: null, feedback: "Grading unavailable \u2014 your answer was recorded.", raw: null };
   const data = await resp.json();
   const raw = data.reply || "";
   const scoreMatch = raw.match(/SCORE:\s*(\d)/);
   const feedbackMatch = raw.match(/FEEDBACK:\s*(.+)/);
+  const parsed = scoreMatch ? parseInt(scoreMatch[1]) : null;
   return {
-    score: scoreMatch ? parseInt(scoreMatch[1]) : null,
+    score: parsed !== null ? Math.min(parsed, 3) : null,
     feedback: feedbackMatch ? feedbackMatch[1].trim() : raw.trim(),
     raw,
   };
@@ -197,26 +198,35 @@ function enableSavingForAssessment() {
   localStorage.setItem("codeprobe_privacy", "saving");
 }
 
-// --- Consent / routing ---
-const consentCheck = $("#consent-check");
-const consentStart = $("#consent-start");
-consentCheck.addEventListener("change", () => { consentStart.disabled = !consentCheck.checked; });
-consentStart.addEventListener("click", () => {
-  enableSavingForAssessment();
-  initQuiz();
-});
+// --- Session persistence ---
+const sessionKey = `codeprobe_assessment_${phase}_session`;
 
-// Auto-resume if there's a saved session
-if (loadSession()) {
-  enableSavingForAssessment();
-  initQuiz();
+function saveSession() {
+  localStorage.setItem(sessionKey, JSON.stringify({
+    index: state.index,
+    answers: state.answers,
+    startTime: state.startTime,
+    order: state.order,
+  }));
 }
 
+function loadSession() {
+  try {
+    const s = JSON.parse(localStorage.getItem(sessionKey));
+    if (s && s.order && s.order.length === questions.length) return s;
+  } catch {}
+  return null;
+}
+
+function clearSession() {
+  localStorage.removeItem(sessionKey);
+}
+
+// --- Completion & time-lock ---
 const completionKey = `codeprobe_assessment_${phase}_complete`;
 const alreadyDone = localStorage.getItem(completionKey);
 const MIN_GAP_MS = 46 * 60 * 60 * 1000; // 46 hours
 
-// Check time lock for post-test
 let timeLocked = false;
 let hoursLeft = 0;
 if (phase === "post" && !alreadyDone) {
@@ -229,11 +239,19 @@ if (phase === "post" && !alreadyDone) {
       hoursLeft = Math.ceil((MIN_GAP_MS - elapsed) / (60 * 60 * 1000));
     }
   } else {
-    // Corrupt or legacy data — reset to pre-test
     localStorage.removeItem("codeprobe_assessment_pre_complete");
     location.reload();
   }
 }
+
+// --- Consent / routing ---
+const consentCheck = $("#consent-check");
+const consentStart = $("#consent-start");
+consentCheck.addEventListener("change", () => { consentStart.disabled = !consentCheck.checked; });
+consentStart.addEventListener("click", () => {
+  enableSavingForAssessment();
+  initQuiz();
+});
 
 if (alreadyDone) {
   let msg, heading;
@@ -269,9 +287,9 @@ if (alreadyDone) {
     const progress = JSON.parse(localStorage.getItem("codeprobe") || "{}");
     const didFinishRec = progress[rec.id] && progress[rec.id].completed > 0;
     if (didFinishRec) {
-      timeLockedCTA = `<a href="/c-fundamentals" class="btn-primary" style="text-decoration:none;display:inline-block;margin-top:14px;padding:12px 24px">Continue learning C</a>`;
+      timeLockedCTA = `<p><a href="/c-fundamentals" class="btn-primary" style="text-decoration:none;display:inline-block;margin-top:14px;padding:12px 24px">Continue learning C</a></p>`;
     } else {
-      timeLockedCTA = `<a href="/c-fundamentals#${rec.id}" class="btn-primary" style="text-decoration:none;display:inline-block;margin-top:14px;padding:12px 24px">${rec.title} \u2192</a>`;
+      timeLockedCTA = `<p><a href="/c-fundamentals#${rec.id}" class="btn-primary" style="text-decoration:none;display:inline-block;margin-top:14px;padding:12px 24px">${rec.title} \u2192</a></p>`;
     }
   }
   $("#consent-screen").innerHTML = `
@@ -282,37 +300,16 @@ if (alreadyDone) {
       ${timeLockedCTA}
       <a href="/" class="btn-secondary" style="margin-top:10px">Back to codeprobe</a>
     </div>`;
+} else if (loadSession()) {
+  enableSavingForAssessment();
+  initQuiz();
 } else {
   const phaseTitle = phase === "pre" ? "Pre-test" : "Post-test";
   const phaseDesc = phase === "pre"
-    ? "This is the <strong>pre-test</strong> — 8 short questions about C programming before you start learning. An AI will give you instant feedback on each answer.<br><br>Your responses are recorded anonymously for a study on learning effectiveness. No personal data is collected beyond your anonymous session ID."
-    : "Welcome back! This is the <strong>post-test</strong> — 8 questions to see how your understanding has grown. Same format as before.<br><br>Your responses are recorded anonymously, same as the pre-test.";
-  $("#consent-heading").textContent = `Comprehension Test — ${phaseTitle}`;
+    ? "This is the <strong>pre-test</strong> \u2014 8 short questions about C programming before you start learning. An AI will give you instant feedback on each answer.<br><br>Your responses are recorded anonymously for a study on learning effectiveness. No personal data is collected beyond your anonymous session ID."
+    : "Welcome back! This is the <strong>post-test</strong> \u2014 8 questions to see how your understanding has grown. Same format as before.<br><br>Your responses are recorded anonymously, same as the pre-test.";
+  $("#consent-heading").textContent = `Comprehension Test \u2014 ${phaseTitle}`;
   $("#consent-desc").innerHTML = phaseDesc;
-}
-
-// --- Session persistence ---
-const sessionKey = `codeprobe_assessment_${phase}_session`;
-
-function saveSession() {
-  localStorage.setItem(sessionKey, JSON.stringify({
-    index: state.index,
-    answers: state.answers,
-    startTime: state.startTime,
-    order: state.order,
-  }));
-}
-
-function loadSession() {
-  try {
-    const s = JSON.parse(localStorage.getItem(sessionKey));
-    if (s && s.order && s.order.length === questions.length) return s;
-  } catch {}
-  return null;
-}
-
-function clearSession() {
-  localStorage.removeItem(sessionKey);
 }
 
 // --- Quiz logic ---
@@ -320,7 +317,7 @@ function initQuiz() {
   $("#consent-screen").classList.add("hidden");
   $("#quiz-screen").classList.remove("hidden");
   const phaseTitle = phase === "pre" ? "Pre-test" : "Post-test";
-  $("#assess-title").textContent = `C Comprehension — ${phaseTitle}`;
+  $("#assess-title").textContent = `C Comprehension \u2014 ${phaseTitle}`;
 
   const saved = loadSession();
   if (saved) {
@@ -328,6 +325,14 @@ function initQuiz() {
     state.answers = saved.answers;
     state.index = saved.index;
     state.startTime = saved.startTime;
+    if (state.answers.length > state.index) {
+      state.index = state.answers.length;
+    }
+    if (state.index >= questions.length) {
+      clearSession();
+      finishQuiz();
+      return;
+    }
   } else {
     const seed = seedFromUID(getUID());
     state.order = shuffle(questions.map((_, i) => i), seed + (phase === "post" ? 9999 : 0));
@@ -384,7 +389,7 @@ $("#q-submit").addEventListener("click", async () => {
   try {
     result = await gradeAnswer(q.code, q.question, answer);
   } catch {
-    result = { score: null, feedback: "Grading unavailable — your answer was recorded.", raw: null };
+    result = { score: null, feedback: "Grading unavailable \u2014 your answer was recorded.", raw: null };
   }
 
   state.answers.push({
@@ -474,19 +479,19 @@ function finishQuiz() {
 
   const phaseTitle = phase === "pre" ? "Pre-test" : "Post-test";
   $("#results-score").textContent = `${total}/${max}`;
-  $("#results-label").textContent = `${phaseTitle} — ${pct}% (preliminary, graded by AI)`;
+  $("#results-label").textContent = `${phaseTitle} \u2014 ${pct}% (preliminary, graded by AI)`;
 
   const list = $("#results-list");
   list.innerHTML = state.answers.map(a => {
     const scoreColor = a.score !== null ? SCORE_COLORS[a.score] : "var(--dim)";
-    const scoreText = a.score !== null ? `${a.score}/3 — ${SCORE_LABELS[a.score]}` : "Pending";
+    const scoreText = a.score !== null ? `${a.score}/3 \u2014 ${SCORE_LABELS[a.score]}` : "Pending";
     return `
       <div class="result-item">
         <div class="result-score-badge" style="background:${scoreColor}">${a.score ?? "?"}</div>
         <div class="result-body">
           <div class="result-concept">${escHTML(a.concept)}</div>
           <div class="result-answer">${escHTML(a.answer)}</div>
-          <div class="result-feedback">${scoreText}${a.feedback ? " — " + escHTML(a.feedback) : ""}</div>
+          <div class="result-feedback">${scoreText}${a.feedback ? " \u2014 " + escHTML(a.feedback) : ""}</div>
         </div>
       </div>`;
   }).join("");
@@ -516,7 +521,7 @@ function finishQuiz() {
   } else {
     nextStep.innerHTML = `
       <div style="text-align:center;background:var(--surface);border:2px solid var(--green);border-radius:8px;padding:20px;margin-bottom:20px">
-        <p style="font-size:15px;font-weight:600;margin-bottom:8px">Study complete — thank you!</p>
+        <p style="font-size:15px;font-weight:600;margin-bottom:8px">Study complete \u2014 thank you!</p>
         <p style="color:var(--dim);font-size:13px">Your results help us improve the platform.</p>
       </div>`;
   }

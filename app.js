@@ -290,24 +290,24 @@ function buildPrompt(lesson, questions) {
   const isQuick = state.mode === "quick";
 
   const approach = isQuick
-    ? `Your job is to QUIZ the student, not lecture them. Address their question briefly (1-2 sentences, but if you see clear curiosity - no limits)${bridgeNote}, then immediately ask ONE quiz question about the code. The student learns by attempting the question, not by reading an explanation.
+    ? `Your job is to QUIZ and teach the student, not overwhelm them. Address their question briefly (1-2 sentences, but if you see clear curiosity - no limits)${bridgeNote}, then immediately ask ONE quiz question about the code. The student learns by attempting the question, not by reading an explanation. ${questions ? "Handing agency to the learner, supporting growth mindset, normalizing unfamiliarity and activating prior knowledge is important." : "However, **this does not apply to your first reply, do not quiz first**. Start by engaging and asking the student a question in order to spark their curiosity and gauge their knowledge/background (NOT their interests/curiosities), and then adapt to it; be specific. Then continue with the quizzes, ADAPTING to their level. Handing agency to the learner, supporting growth mindset, normalizing unfamiliarity and activating prior knowledge is important. Only quiz/teach after they respond."}
 
 After they answer:
-- If correct: brief feedback, 1-sentence summary, end with [LESSON_COMPLETE].
-- If there is no evidence of attempted solution or lack of understanding is evident: stop quizzing and explaining, instead, ask them and try to understand what they do know, then downgrade the interactions to their level.
+- If correct AND it shows understanding of the lesson: brief feedback, 1-sentence summary, end with [LESSON_COMPLETE].
+- **VERY IMPORTANT**: If there is no evidence of attempted solution or lack of understanding is evident: stop quizzing and explaining, instead, ask them and try to understand what they do know, then downgrade the interactions to their level.
 - If wrong (first attempt): If possible, give only a brief, encouraging hint that steers them closer to the right answer. No new quizzes or explanations.
-- If wrong (second attempt): Reveal the correct answer with a brief elaboration of WHY it is correct, ask a NEW question. Do NOT end with [LESSON_COMPLETE] until they answer a question correctly.
+- If wrong (second or more attempt): Reveal the correct answer with a brief elaboration of WHY it is correct, ask a NEW question. Do NOT end with [LESSON_COMPLETE] until they answer a question correctly.
 CRITICAL: Never use [LESSON_COMPLETE] in the same response where you corrected the student. Do NOT end with [LESSON_COMPLETE] until they answer a question correctly.
 
 RULES: Be conversational. ONE question only. Use backtick code snippets. Reference specific lines. ~1-3 total exchanges. Only reference languages the student knows — do NOT assume knowledge of languages not listed.${levelNote}`
-    : `Your job is to QUIZ the student, not lecture them. Address their question briefly (but if you see clear curiosity - no limits)${bridgeNote}, then immediately ask ONE quiz question about the code. The student learns by attempting the question, not by reading an explanation.
+    : `Your job is to QUIZ and teach the student, not overwhelm them. Address their question briefly (but if you see clear curiosity - no limits)${bridgeNote}, then immediately ask ONE quiz question about the code. The student learns by attempting the question, not by reading an explanation. ${questions ? "Handing agency to the learner, supporting growth mindset, normalizing unfamiliarity and activating prior knowledge is important." : "However, **this does not apply to your first reply, do not quiz first**. Start by engaging and asking the student a question in order to spark their curiosity and gauge their knowledge/background (NOT their interests/curiosities), and then adapt to it; be specific. Then continue with the quizzes, ADAPTING to their level. Handing agency to the learner, supporting growth mindset, normalizing unfamiliarity and activating prior knowledge is important. Only quiz/teach after they respond."}
 
 After they answer:
 - If correct AND it's been 4-5 exchanges: brief feedback, summarize what they learned in 2-3 sentences, end with [LESSON_COMPLETE].
 - If correct but early: brief feedback, teach the next concept in 1-2 sentences, ask a NEW quiz question.
-- If there is no evidence of attempted solution or lack of understanding is evident: stop quizzing and explaining, instead, ask them and try to understand what they do know, then downgrade the interactions to their level.
+- **VERY IMPORTANT**: If there is no evidence of attempted solution or lack of understanding is evident: stop quizzing and explaining, instead, ask them and try to understand what they do know, then downgrade the interactions to their level.
 - If wrong (first attempt): If possible, give only a brief, encouraging hint that steers them closer to the right answer. No new quizzes or explanations.
-- If wrong (second attempt): Reveal the correct answer with some elaboration of WHY it is correct, ask a NEW question. Do NOT end with [LESSON_COMPLETE] until they answer a question correctly.
+- If wrong (second or more attempt): Reveal the correct answer with some elaboration of WHY it is correct, ask a NEW question. Do NOT end with [LESSON_COMPLETE] until they answer a question correctly.
 CRITICAL: Never use [LESSON_COMPLETE] in the same response where you corrected the student. Do NOT end with [LESSON_COMPLETE] until they answer a question correctly.
 
 RULES: Be conversational. ONE question at a time. Use backtick code snippets. Reference specific lines. ~5-7 total exchanges. Only reference languages the student knows — do NOT assume knowledge of languages not listed.${levelNote}`;
@@ -327,7 +327,7 @@ ${code}
 
 CONCEPTS: ${lesson.concepts.join(", ")}
 
-STUDENT QUESTIONS: ${questions || "(none — start with the most important concept)"}`;
+${questions ? `STUDENT QUESTIONS: ${questions}` : ""}`;
 }
 
 // Demo response always working for c-pointers: lesson with "What does &x give you?"
@@ -361,6 +361,7 @@ async function chat(messages) {
       const r = await fetch("/api/chat", { method: "POST", headers: h, body });
       if (r.ok) return (await r.json()).reply;
       lastErr = (await r.json().catch(() => ({}))).error || `Error ${r.status}`;
+      if (r.status === 403 && !isSaving()) { _memToken = null; Object.assign(h, await apiHeaders()); continue; }
       if (r.status < 500) break;
     } catch (e) {
       lastErr = e.message;
@@ -457,6 +458,7 @@ function renderSeeds() {
   const seeds = state.lesson.seedQuestions
     .map(q => `<span class="seed">${escHTML(q)}</span>`).join("");
   el.innerHTML =
+    `<div class="seed-hint">if the code looks unfamiliar, good — that's where learning starts</div>` +
     `<span class="seed seed-go">start learning</span>` +
     `<span class="seed-toggle">example questions <span class="seed-arrow">&#9662;</span></span>` +
     `<div class="seed-drawer hidden">${seeds}</div>`;
@@ -505,7 +507,7 @@ function setPhase(phase, { silent = false } = {}) {
   if (phase === "explore") $("#phase-explore").classList.remove("hidden");
   else if (phase === "learn" || phase === "challenge") {
     $("#phase-chat").classList.remove("hidden");
-    if (phase === "challenge" && !silent) addMsg("challenge", "final challenge");
+    if (phase === "challenge" && !silent) addMsg("challenge", "almost done!");
   }
   else if (phase === "done") $("#phase-complete").classList.remove("hidden");
   if (!silent) saveSession();
@@ -513,9 +515,9 @@ function setPhase(phase, { silent = false } = {}) {
 
 function updateExchange() {
   const el = $("#exchange-text");
-  if (state.phase === "challenge") el.textContent = "final challenge";
+  if (state.phase === "challenge") el.textContent = "almost done!";
   else {
-    const target = state.mode === "quick" ? "~1" : "~3";
+    const target = state.mode === "quick" ? "~2" : "~4";
     el.textContent = `exchange ${state.exchangeCount} of ${target}`;
   }
 }
@@ -585,10 +587,10 @@ function renderDone(summary) {
     <h2>you understand this now.</h2>
     <div class="concepts">${lesson.concepts.map(c => `<span class="tag">${c.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</span>`).join("")}</div>
     <div class="summary">${fmt(summary)}</div>
-    ${first ? `<div class="revisit-note">come back tomorrow to revisit this lesson &mdash; spaced repetition dramatically improves retention.</div>` : ""}
+    ${first ? `<div class="revisit-note">come back tomorrow &mdash; you'll be surprised how much stayed with you.</div>` : ""}
     <div class="comp-actions">
-      <button class="btn-primary" id="go-home">another lesson</button>
-      <button class="btn-secondary" id="go-retry">try again</button>
+      <button class="btn-primary" id="go-retry">practice again</button>
+      <button class="btn-secondary" id="go-home">explore more</button>
     </div>
     ${saveHint}`;
 
@@ -651,8 +653,9 @@ async function startLearning() {
   state.messages = [{ role: "system", content: buildPrompt(state.lesson, q) }];
   setPhase("learn");
   updateExchange();
-  const est = state.mode === "quick" ? "~1 exchange" : "~3 exchanges ahead";
+  const est = state.mode === "quick" ? "~2 exchanges" : "~4 exchanges ahead";
   addMsg("system", q ? `questions sent. ${est}.` : `starting. ${est}.`);
+  addMsg("system", "if it takes effort, good \u2014 that's what helps learning stick.");
   track("start_learning", { lesson: state.lesson.id, questions: q, mode: state.mode, lang: state.lang });
   saveSession();
   await getLLMResponse();
@@ -696,14 +699,29 @@ async function getLLMResponse() {
   $("#chat-input").focus();
 }
 
+function injectLineRefs(text) {
+  try {
+    const code = state.lesson?.files ? state.lesson.files[state.fileIdx]?.code : state.lesson?.code;
+    if (!code) return text;
+    const lines = code.split("\n");
+    return text.replace(/[Ll]ines?\s+(\d+)(?:\s*[-–]\s*(\d+))?/g, (match, s, e) => {
+      const start = parseInt(s), end = e ? parseInt(e) : start;
+      if (start < 1 || start > lines.length || end < start) return match;
+      const slice = lines.slice(start - 1, Math.min(end, lines.length));
+      if (slice.every(l => !l.trim())) return match;
+      return `${match}: \`${slice.join("\n")}\``;
+    });
+  } catch { return text; }
+}
+
 async function sendMsg() {
   const input = $("#chat-input");
   const text = input.value.trim();
   if (!text || state.loading) return;
   input.value = "";
-  state.messages.push({ role: "user", content: text });
-  state.exchangeCount++;
   addMsg("user", text);
+  state.messages.push({ role: "user", content: injectLineRefs(text) });
+  state.exchangeCount++;
   updateExchange();
   track("user_msg", { lesson: state.lesson.id, text });
   saveSession();
@@ -864,7 +882,6 @@ function enableSaving() {
   const uid = getUID(); // promotes session UID to persistent
   localStorage.setItem("codeprobe_uid", uid);
   localStorage.setItem("codeprobe_privacy", "saving");
-  _tokenPromise = makeToken(uid);
   identify();
   renderSaveToggle();
   renderHome();
@@ -877,7 +894,6 @@ function pauseSaving() {
 
 function resumeSaving() {
   localStorage.setItem("codeprobe_privacy", "saving");
-  _tokenPromise = makeToken(getUID());
   identify();
   renderSaveToggle();
 }
@@ -914,11 +930,12 @@ async function deleteEverything() {
     await fetch("/api/delete", { method: "POST", headers: h });
   } catch {}
   localStorage.removeItem("codeprobe_uid");
+  localStorage.removeItem("codeprobe_token");
   localStorage.removeItem("codeprobe_privacy");
   localStorage.removeItem("codeprobe");
   localStorage.removeItem("codeprobe_session");
   _sessionUID = crypto.randomUUID();
-  _tokenPromise = makeToken(_sessionUID);
+  _memToken = null;
   renderSaveToggle();
   renderHome();
   toast("all data deleted");

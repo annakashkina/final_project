@@ -359,6 +359,12 @@ body {
 
 .seed:hover { border-color: var(--accent); }
 
+.seed-hint {
+  font-size: 13px;
+  color: var(--dim);
+  margin-bottom: 10px;
+}
+
 .seed-go {
   display: inline-block;
   background: var(--accent) !important;

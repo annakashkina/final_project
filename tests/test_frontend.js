@@ -548,6 +548,156 @@ test("UUID: crypto.randomUUID format", () => {
   }
 });
 
+// ── Lesson recommendation (imported from assessment_recommend.js) ─────
+
+import { CONCEPT_TO_LESSON, recommendLesson } from "../assessment_recommend.js";
+
+// Helper to build answer arrays quickly
+function ans(concept, score) { return { concept, score }; }
+
+test("recommendLesson: picks partial-understanding concept (score 1-2), easiest first", () => {
+  const answers = [
+    ans("write() and file descriptors", 3),       // aced
+    ans("Strings and the \\0 loop", 2),           // partial, difficulty 1
+    ans("Character checks and ASCII math", 1),    // partial, difficulty 0 ← should pick this
+    ans("argc/argv and argument handling", 3),
+    ans("Linked list traversal", 0),
+    ans("Recursion", 3),
+    ans("Static variables and persistent state", 3),
+    ans("Logic: swap and in-place modification", 3),
+  ];
+  const rec = recommendLesson(answers);
+  assertEqual(rec.id, "s01-ascii", "should pick easiest partial concept");
+  assertEqual(rec.difficulty, 0);
+});
+
+test("recommendLesson: among multiple partial at same difficulty, picks first encountered", () => {
+  const answers = [
+    ans("write() and file descriptors", 2),       // partial, difficulty 0
+    ans("Character checks and ASCII math", 1),    // partial, difficulty 0
+    ans("Strings and the \\0 loop", 3),
+    ans("argc/argv and argument handling", 3),
+    ans("Linked list traversal", 3),
+    ans("Recursion", 3),
+    ans("Static variables and persistent state", 3),
+    ans("Logic: swap and in-place modification", 3),
+  ];
+  const rec = recommendLesson(answers);
+  assertEqual(rec.difficulty, 0, "should pick difficulty 0");
+  assert(rec.id === "s01-write" || rec.id === "s01-ascii", "should be one of the two difficulty-0 partials");
+});
+
+test("recommendLesson: all zeros → picks easiest weak concept", () => {
+  const answers = [
+    ans("write() and file descriptors", 0),
+    ans("Strings and the \\0 loop", 0),
+    ans("Character checks and ASCII math", 0),
+    ans("argc/argv and argument handling", 0),
+    ans("Linked list traversal", 0),
+    ans("Recursion", 0),
+    ans("Static variables and persistent state", 0),
+    ans("Logic: swap and in-place modification", 0),
+  ];
+  const rec = recommendLesson(answers);
+  assertEqual(rec.difficulty, 0, "should pick easiest (difficulty 0)");
+  assert(rec.id === "s01-write" || rec.id === "s01-ascii", "should be a beginner lesson");
+});
+
+test("recommendLesson: all aced → fallback to recursion", () => {
+  const answers = [
+    ans("write() and file descriptors", 3),
+    ans("Strings and the \\0 loop", 3),
+    ans("Character checks and ASCII math", 3),
+    ans("argc/argv and argument handling", 3),
+    ans("Linked list traversal", 3),
+    ans("Recursion", 3),
+    ans("Static variables and persistent state", 3),
+    ans("Logic: swap and in-place modification", 3),
+  ];
+  const rec = recommendLesson(answers);
+  assertEqual(rec.id, "s01a2-recursion", "should fallback to recursion");
+});
+
+test("recommendLesson: mix of 0s and 3s, no partials → picks easiest 0", () => {
+  const answers = [
+    ans("write() and file descriptors", 3),
+    ans("Strings and the \\0 loop", 3),
+    ans("Character checks and ASCII math", 3),
+    ans("argc/argv and argument handling", 0),    // difficulty 2
+    ans("Linked list traversal", 0),              // difficulty 1 ← should pick
+    ans("Recursion", 0),                          // difficulty 2
+    ans("Static variables and persistent state", 3),
+    ans("Logic: swap and in-place modification", 3),
+  ];
+  const rec = recommendLesson(answers);
+  assertEqual(rec.id, "s01a2-linked-list", "should pick linked list (easiest among zeros)");
+});
+
+test("recommendLesson: high scorer with one partial → picks that one", () => {
+  const answers = [
+    ans("write() and file descriptors", 3),
+    ans("Strings and the \\0 loop", 3),
+    ans("Character checks and ASCII math", 3),
+    ans("argc/argv and argument handling", 3),
+    ans("Linked list traversal", 3),
+    ans("Recursion", 2),                          // only partial ← should pick
+    ans("Static variables and persistent state", 3),
+    ans("Logic: swap and in-place modification", 3),
+  ];
+  const rec = recommendLesson(answers);
+  assertEqual(rec.id, "s01a2-recursion", "should pick the single partial concept");
+});
+
+test("recommendLesson: low scorer with one partial among zeros → prefers partial", () => {
+  const answers = [
+    ans("write() and file descriptors", 0),
+    ans("Strings and the \\0 loop", 0),
+    ans("Character checks and ASCII math", 1),    // partial ← should pick this over zeros
+    ans("argc/argv and argument handling", 0),
+    ans("Linked list traversal", 0),
+    ans("Recursion", 0),
+    ans("Static variables and persistent state", 0),
+    ans("Logic: swap and in-place modification", 0),
+  ];
+  const rec = recommendLesson(answers);
+  assertEqual(rec.id, "s01-ascii", "partial always preferred over zeros");
+});
+
+test("recommendLesson: Form B concept (modular arithmetic) maps correctly", () => {
+  const answers = [
+    ans("write() and file descriptors", 3),
+    ans("Strings and the \\0 loop", 3),
+    ans("Character checks and ASCII math", 3),
+    ans("argc/argv and argument handling", 3),
+    ans("Logic: modular arithmetic and state", 1),  // Form B version
+    ans("Linked list traversal", 3),
+    ans("Recursion", 3),
+    ans("Static variables and persistent state", 3),
+  ];
+  const rec = recommendLesson(answers);
+  assertEqual(rec.id, "s01-control-flow", "Form B logic concept should map to control-flow lesson");
+});
+
+test("recommendLesson: null scores treated same as 0", () => {
+  const answers = [
+    ans("write() and file descriptors", null),
+    ans("Strings and the \\0 loop", 3),
+    ans("Character checks and ASCII math", 3),
+    ans("argc/argv and argument handling", null),
+    ans("Linked list traversal", 3),
+    ans("Recursion", 3),
+    ans("Static variables and persistent state", 3),
+    ans("Logic: swap and in-place modification", 3),
+  ];
+  const rec = recommendLesson(answers);
+  assertEqual(rec.id, "s01-write", "null scores should be treated as weak, pick easiest");
+});
+
+test("recommendLesson: empty answers → fallback", () => {
+  const rec = recommendLesson([]);
+  assertEqual(rec.id, "s01a2-recursion", "empty answers should fallback");
+});
+
 // ── Report ─────────────────────────────────────────────────────────────
 
 function report() {
@@ -567,7 +717,8 @@ if (typeof process !== "undefined" && process.exit) {
   process.exit(r.failed > 0 ? 1 : 0);
 }
 
-// If running in browser, export for test_frontend.html
+// Export for browser module usage and legacy window access
+export { report as _testReport };
 if (typeof window !== "undefined") {
   window._testReport = report;
 }

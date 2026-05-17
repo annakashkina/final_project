@@ -16,7 +16,7 @@ class TestFrontend(unittest.TestCase):
 
         try:
             result = subprocess.run(
-                ["node", js_path],
+                ["node", "--experimental-default-type=module", js_path],
                 capture_output=True,
                 text=True,
                 timeout=10,

@@ -1471,4 +1471,825 @@ def end_headers(self):
       "What goes wrong if you change VALIDATOR_HMAC_KEY without re-signing the model?",
     ],
   },
+
+  {
+    id: "meta-tracks",
+    title: "Track Discovery & the Landing Page",
+    difficulty: "Project",
+    icon: "🗺️",
+    description:
+      "The landing page builds itself. At startup, the server scans every lessons*.js file for a @codeprobe-track JSON comment, generates an HTML page for each track, and assembles the landing page with grouped cards. Adding a new track is one file and one JSON block.",
+    concepts: [
+      "@codeprobe-track: JSON metadata in a block comment at the top of each lessons*.js",
+      "_discover_tracks() runs at startup — scans files, generates pages, stores in memory",
+      "_track.html template: {{LESSONS_SRC}} and {{TITLE}} are replaced per track",
+      "Landing page cards are grouped by 'section' and sorted by 'order'",
+      "Naming convention: lessons.js → /default, lessons_foo.js → /foo",
+    ],
+    bridges: {
+      Python: "glob.glob finds files, json.loads parses metadata — all stdlib, no templating library.",
+      JavaScript: "The metadata is just a JS comment with JSON inside — Python regex-parses it, not JS.",
+      Java: "Like annotation processing — structured metadata in comments, read at startup to generate routes.",
+    },
+    files: [
+      {
+        name: "lessons_onboarding.js",
+        code: `/* @codeprobe-track
+{"title": "codeprobe — onboarding",
+ "section": "Onboarding",
+ "order": 1,
+ "icon": "🔧",
+ "name": "How codeprobe works",
+ "description": "Learn the codeprobe codebase itself.",
+ "meta": ["29 lessons", "9 series"]}
+*/
+// This JSON block is all the server needs to create a track.
+// "section" groups tracks on the landing page.
+// "order" controls sort order within a section.
+// "meta" is an array of badge strings shown on the card.
+//
+// The rest of the file is a normal ES module:
+import { overviewLessons, metaLessons } from "./lessons/meta.js";
+export const series = [overviewLessons, /* ... */];
+export const lessons = series.flatMap(s => {
+  for (const l of s.lessons) l.series = s.name;
+  return s.lessons;
+});`,
+      },
+      {
+        name: "serve.py",
+        code: `# At startup, _discover_tracks() scans every lessons*.js file.
+# Result: a dict of route → HTML bytes, held in memory forever.
+
+_TRACK_RE = re.compile(
+    r'/\\*\\s*@codeprobe-track\\s*\\n(.*?)\\*/', re.DOTALL)
+
+def _discover_tracks():
+    pages = {}   # {"/default": b"<html>...", "/onboarding": b"..."}
+    tracks = []  # metadata for landing page cards
+
+    for path in sorted(glob.glob("lessons*.js")):
+        fname = os.path.basename(path)
+        # lessons.js → "default", lessons_foo.js → "foo"
+        route = "default" if fname == "lessons.js" \\
+                else fname.removeprefix("lessons_").removesuffix(".js")
+
+        # Parse @codeprobe-track JSON from block comment
+        m = _TRACK_RE.search(open(path).read())
+        meta = json.loads(m.group(1).strip()) if m else {}
+
+        # Generate track page from _track.html template
+        page = track_html \\
+            .replace("{{LESSONS_SRC}}", f"./{fname}") \\
+            .replace("{{TITLE}}", html.escape(meta.get("title", "codeprobe")))
+        pages[f"/{route}"] = page.encode()
+
+        if "section" in meta:
+            tracks.append({"route": route, **meta})
+
+    # Build landing page: group by section, sort by order
+    tracks.sort(key=lambda t: t.get("order", 999))
+    sections = {}
+    for t in tracks:
+        sections.setdefault(t["section"], []).append(t)
+    # ... generate HTML cards, inject into _landing.html
+    pages["/"] = landing_html.replace("{{TRACKS}}", cards).encode()
+    return pages
+
+_PAGES = _discover_tracks()  # runs once at import time`,
+      },
+      {
+        name: "how_to_add_a_track.txt",
+        code: `HOW TO ADD A NEW TRACK
+=====================
+
+1. Create a file: lessons_yourname.js
+
+2. Add a @codeprobe-track block comment at the top:
+   /* @codeprobe-track
+   {"title": "Your Track",
+    "section": "Your Section",
+    "order": 2,
+    "icon": "🎯",
+    "name": "Track Name",
+    "description": "One-line description."}
+   */
+
+3. Export { series, lessons } as usual:
+   export const series = [{ name: "Your Topic", lessons: [...] }];
+   export const lessons = series.flatMap(s => ...);
+
+4. Restart the server — it auto-discovers the file.
+
+5. Visit /yourname to see your track.
+   The landing page shows it automatically.`,
+      },
+    ],
+    seedQuestions: [
+      "How would you add a brand-new track to the platform?",
+      "Why are track pages generated at startup instead of on each request?",
+      "What happens if a lessons*.js file has no @codeprobe-track metadata?",
+      "Why does the landing page group tracks by 'section'?",
+    ],
+  },
+
+  {
+    id: "meta-code-display",
+    title: "Code Display, Tabs & Line Numbers",
+    difficulty: "Project",
+    icon: "📄",
+    description:
+      "The left panel shows syntax-highlighted code with line numbers and file tabs. highlight.js runs client-side from a self-hosted vendor copy. Line numbers are injected after highlighting to avoid breaking syntax tokens. Multi-file lessons get clickable tabs.",
+    concepts: [
+      "highlight.js: self-hosted in vendor/ — no CDN, no supply-chain risk",
+      "EXT_LANG maps file extensions to hljs language names (c, rust, python, ...)",
+      "Multi-file lessons render tab buttons; single-file lessons show a generated filename",
+      "Line numbers are injected AFTER highlighting (prevents breaking token spans)",
+      "Light/dark hljs stylesheets swap with the theme toggle (disabled attribute)",
+    ],
+    bridges: {
+      Python: "Like Pygments — tokenize code, wrap spans with CSS classes for colors.",
+      JavaScript: "hljs.highlightElement() does in-place DOM modification — like Prism.js but older and simpler.",
+      Java: "Like a syntax highlighter plugin — processes a <code> element, outputs colored <span>s.",
+    },
+    files: [
+      {
+        name: "app.js",
+        code: `// File extension → highlight.js language name
+const EXT_LANG = {
+  c: "c", rs: "rust", py: "python",
+  ts: "typescript", js: "javascript", cpp: "cpp", rb: "ruby",
+};
+
+function renderCode(idx) {
+  const lesson = state.lesson;
+  const codeEl = $("#code-display");
+  let code, langClass;
+
+  if (lesson.files) {
+    // Multi-file: show tabs, load selected file
+    idx = idx ?? state.fileIdx;
+    code = lesson.files[idx].code;
+    const ext = lesson.files[idx].name.match(/\\.(\\w+)/)?.[1];
+    langClass = ext && EXT_LANG[ext]
+      ? \`language-\${EXT_LANG[ext]}\` : "";
+
+    // Render tab buttons — clicking switches the file
+    $("#file-tabs").innerHTML = lesson.files.map((f, i) =>
+      \`<span class="file-tab \${i === idx ? "active" : ""}"
+             data-idx="\${i}">\${f.name}</span>\`
+    ).join("");
+    $$("#file-tabs .file-tab").forEach(t =>
+      t.addEventListener("click", () => {
+        state.fileIdx = +t.dataset.idx;
+        renderCode(state.fileIdx);
+      })
+    );
+  } else {
+    // Single file: auto-detect language, show generated filename
+    code = lesson.code;
+    langClass = null;  // let hljs auto-detect
+  }
+
+  // Step 1: set language class for hljs grammar selection
+  codeEl.className = langClass || "";
+  codeEl.removeAttribute("data-highlighted");
+  codeEl.textContent = code;
+
+  // Step 2: highlight — replaces textContent with colored spans
+  hljs.highlightElement(codeEl);
+
+  // Step 3: inject line numbers AFTER highlighting
+  // (inserting before would split hljs <span> tokens)
+  codeEl.innerHTML = codeEl.innerHTML
+    .split("\\n")
+    .map((line, i) =>
+      \`<span class="ln">\${String(i + 1).padStart(3)}</span>\${line}\`)
+    .join("\\n");
+}`,
+      },
+      {
+        name: "_track.html",
+        code: `<!-- highlight.js is self-hosted (no CDN dependency).
+     Core includes C, JS, Python. Extra languages loaded here. -->
+
+<link id="hljs-light" rel="stylesheet"
+      href="vendor/highlight.js/styles/github.min.css">
+<link id="hljs-dark" rel="stylesheet" disabled
+      href="vendor/highlight.js/styles/github-dark.min.css">
+
+<script src="vendor/highlight.js/highlight.min.js"></script>
+<script src="vendor/highlight.js/languages/rust.min.js"></script>
+<script src="vendor/highlight.js/languages/typescript.min.js"></script>
+<script src="vendor/highlight.js/languages/ruby.min.js"></script>
+<script src="vendor/highlight.js/languages/cpp.min.js"></script>
+
+<!-- To add a new language (e.g., Go):
+     1. Download go.min.js from highlightjs.org
+     2. Put it in vendor/highlight.js/languages/
+     3. Add a <script> tag here
+     4. Add { go: "go" } to EXT_LANG in app.js -->`,
+      },
+    ],
+    seedQuestions: [
+      "Why are line numbers injected AFTER syntax highlighting?",
+      "How would you add Go syntax highlighting to the platform?",
+      "Why is highlight.js self-hosted instead of loaded from a CDN?",
+      "What happens if a lesson file has an extension not in EXT_LANG?",
+    ],
+  },
+
+  {
+    id: "meta-layout",
+    title: "Theme, Drag Handle & Layout",
+    difficulty: "Project",
+    icon: "🎨",
+    description:
+      "Light and dark themes via CSS variables, a draggable divider between code and chat panels with mouse and touch support, and a responsive layout that stacks on mobile. All preferences persist in localStorage.",
+    concepts: [
+      "Theme: data-theme on <html>, CSS variables switch all colors at once",
+      "Drag handle: mousedown/mousemove/mouseup + touch events resize a CSS Grid",
+      "Grid layout: code | 6px handle | chat, clamped between 20% and 80%",
+      "Responsive: @media (max-width: 900px) stacks panels, hides the handle",
+      "hljs light/dark stylesheets toggle via the disabled attribute",
+    ],
+    bridges: {
+      Python: "CSS variables work like Python constants — define once at the top, reference everywhere.",
+      JavaScript: "addEventListener patterns for both mouse and touch — same drag logic, different event APIs.",
+      Java: "Like Swing's JSplitPane — a draggable divider between two content panels.",
+    },
+    files: [
+      {
+        name: "app.js — theme toggle",
+        code: `// Theme persists in localStorage. applyTheme() runs on load.
+
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  localStorage.setItem("codeprobe_theme", theme);
+
+  // Swap highlight.js stylesheets
+  document.getElementById("hljs-light").disabled = (theme === "dark");
+  document.getElementById("hljs-dark").disabled  = (theme === "light");
+
+  // Button icon: ☀ in dark mode, ☾ in light mode
+  document.getElementById("theme-toggle").textContent =
+    theme === "dark" ? "\\u2600" : "\\u263E";
+}
+
+$("#theme-toggle").addEventListener("click", () => {
+  const current = document.documentElement.dataset.theme || "light";
+  applyTheme(current === "dark" ? "light" : "dark");
+});
+
+applyTheme(localStorage.getItem("codeprobe_theme") || "light");`,
+      },
+      {
+        name: "app.js — drag handle",
+        code: `// Drag handle: resize code vs chat panels.
+// Mouse + touch. Clamped 20-80%.
+
+const handle = $("#drag-handle");
+const layout = $(".lesson-layout");
+let dragging = false;
+
+function startDrag(e) {
+  e.preventDefault();
+  dragging = true;
+  handle.classList.add("dragging");
+  document.body.style.cursor = "col-resize";
+  document.body.style.userSelect = "none";
+}
+
+function onDrag(clientX) {
+  if (!dragging) return;
+  const rect = layout.getBoundingClientRect();
+  const pct = ((clientX - rect.left) / rect.width) * 100;
+  const clamped = Math.min(Math.max(pct, 20), 80);
+  layout.style.gridTemplateColumns = \`\${clamped}% 6px 1fr\`;
+}
+
+function endDrag() {
+  if (!dragging) return;
+  dragging = false;
+  handle.classList.remove("dragging");
+  document.body.style.cursor = "";
+  document.body.style.userSelect = "";
+}
+
+// Mouse events
+handle.addEventListener("mousedown", startDrag);
+document.addEventListener("mousemove", e => onDrag(e.clientX));
+document.addEventListener("mouseup", endDrag);
+
+// Touch events (mobile)
+handle.addEventListener("touchstart", startDrag, { passive: false });
+document.addEventListener("touchmove", e => {
+  if (dragging) { e.preventDefault(); onDrag(e.touches[0].clientX); }
+}, { passive: false });
+document.addEventListener("touchend", endDrag);`,
+      },
+      {
+        name: "style.css",
+        code: `/* CSS Grid: code | handle | chat */
+.lesson-layout {
+  display: grid;
+  grid-template-columns: 1fr 6px 1fr;
+  height: calc(100vh - 42px);
+}
+
+.drag-handle {
+  cursor: col-resize;
+  background: var(--border);
+  transition: background 0.15s;
+}
+.drag-handle:hover, .drag-handle.dragging {
+  background: var(--accent);
+}
+
+/* Mobile: stack vertically, hide handle */
+@media (max-width: 900px) {
+  .lesson-layout { grid-template-columns: 1fr; }
+  .code-panel    { max-height: 40vh; }
+  .chat-panel    { min-height: 50vh; }
+  .drag-handle   { display: none; }
+}
+
+/* Theme via CSS variables on :root */
+:root {
+  --bg: #f0f0f0; --surface: #fff; --border: #ddd;
+  --text: #1a1a1a; --dim: #888; --accent: #4a9eff;
+}
+[data-theme="dark"] {
+  --bg: #1a1a1a; --surface: #242424; --border: #3a3a3a;
+  --text: #ddd;
+}`,
+      },
+    ],
+    seedQuestions: [
+      "Why clamp the drag handle between 20% and 80%?",
+      "Why does the drag handle need both mouse AND touch events?",
+      "What's the advantage of CSS variables for theming vs separate stylesheets?",
+      "Why does the mobile layout hide the drag handle entirely?",
+    ],
+  },
+
+  {
+    id: "meta-scaffolding",
+    title: "\"I Already Know\" & Language Selection",
+    difficulty: "Project",
+    icon: "🧠",
+    description:
+      "Two sets of chips let students declare what they know. The AI adapts: bridges filter to known languages, explanations skip known concepts, and the entire response can be in any of 21 languages. This is how the tutor personalizes without accounts.",
+    concepts: [
+      "LANG_CHIPS (10 languages) + CONCEPT_CHIPS (7 CS topics) as self-assessment",
+      "Chips persist in localStorage (codeprobe_knows) — functional, not tracking data",
+      "buildPrompt() filters bridges to known languages, adds level notes for unknowns",
+      "Language selector: 21 languages, instruction injected into the system prompt",
+      "If no languages selected, bridges are omitted (tutor asks before referencing other languages)",
+    ],
+    bridges: {
+      Python: "getKnownItems() is like json.loads on a localStorage string — returns a list of strings.",
+      Java: "Like a Set<String> of capabilities — the prompt builder checks membership to decide what to include.",
+      Ruby: "Like a persistent array of tags — saved as JSON, loaded on startup, drives prompt construction.",
+    },
+    files: [
+      {
+        name: "app.js — chips",
+        code: `// Two rows of clickable chips on the home screen.
+// Persisted regardless of privacy mode — they're
+// functional (steer the AI), not tracking data.
+
+const LANG_CHIPS = [
+  "Python", "JavaScript", "Java", "C", "C++",
+  "TypeScript", "Ruby", "Rust", "Go", "C#",
+];
+const CONCEPT_CHIPS = [
+  "OOP", "Data structures", "Memory management",
+  "Concurrency", "Functional programming",
+  "Databases / SQL", "Algorithms",
+];
+
+function getKnownItems() {
+  try {
+    return JSON.parse(
+      localStorage.getItem("codeprobe_knows") || "[]");
+  } catch { return []; }
+}
+
+function getKnownLangs() {
+  return getKnownItems().filter(i => LANG_CHIPS.includes(i));
+}
+
+function getKnownConcepts() {
+  return getKnownItems().filter(i => CONCEPT_CHIPS.includes(i));
+}
+
+// Click toggles a chip on/off
+chip.addEventListener("click", () => {
+  let items = getKnownItems();
+  if (items.includes(item))
+    items = items.filter(i => i !== item);
+  else items.push(item);
+  saveKnownItems(items);
+  chip.classList.toggle("active");
+});`,
+      },
+      {
+        name: "app.js — prompt adaptation",
+        code: `// Inside buildPrompt(): chips shape what the AI says.
+
+const known = getKnownLangs();       // e.g. ["Python", "Java"]
+const concepts = getKnownConcepts(); // e.g. ["OOP"]
+
+// 1. Filter bridges to known languages only
+let bridges = "";
+if (known.length > 0) {
+  let entries = Object.entries(lesson.bridges)
+    .filter(([lang]) => known.includes(lang));
+  if (entries.length === 0)
+    entries = Object.entries(lesson.bridges); // fallback
+  bridges = entries.map(([l, n]) => \`- \${l}: \${n}\`).join("\\n");
+}
+
+// 2. Build student description
+// → "a programmer who has worked with Python, Java
+//    and has experience with OOP"
+// → "a student who is likely a beginner" if nothing
+
+// 3. Level notes for MISSING concepts
+const missing = [];
+if (!concepts.includes("Memory management"))
+  missing.push("memory management (pointers, heap/stack)");
+if (!concepts.includes("Concurrency"))
+  missing.push("concurrency (threads, async)");
+if (missing.length > 0) {
+  levelNote = "The student has NOT indicated knowledge of: "
+    + missing.join(", ")
+    + ". Do NOT assume they understand these.";
+}
+
+// 4. Language: if not English, instruct in that language
+const langInstruction = state.lang !== "en"
+  ? \`Respond entirely in \${LANG_NAMES[state.lang]}.\`
+  : "";
+
+// 21 languages: en, es, fr, de, it, pt, ru, zh, ja, ko,
+// ar, hi, tr, nl, pl, uk, vi, th, et, lv, lt`,
+      },
+    ],
+    seedQuestions: [
+      "Why do 'I already know' chips persist even in ephemeral mode?",
+      "What changes in the prompt when a student selects 'Python' and 'OOP'?",
+      "Why tell the AI what the student does NOT know?",
+      "How does the language selector change the AI's behavior?",
+    ],
+  },
+
+  {
+    id: "meta-events",
+    title: "Event Tracking & Data Flow",
+    difficulty: "Project",
+    icon: "📡",
+    description:
+      "When a student opts in, every meaningful action becomes a JSONL event: lesson opens, messages sent, phases changed, lessons completed. The browser fires and forgets; the server enforces privacy and appends to per-user files. The first event also records GDPR consent.",
+    concepts: [
+      "track() is fire-and-forget: only sends when isSaving() is true",
+      "12 event types covering the full learning journey",
+      "Server double-checks X-Mode — silently discards events if not 'saving'",
+      "First event triggers consent_ts in _users.json (GDPR proof of opt-in)",
+      "JSONL: one JSON object per line, per-user file, append-only",
+    ],
+    bridges: {
+      Python: "Like logging.info() scattered through the code — each call appends one line to a file.",
+      JavaScript: "fetch().catch(() => {}) — fire-and-forget, never blocks the UI or shows errors.",
+      Java: "Like an event bus — track() publishes, the server subscribes and persists to disk.",
+    },
+    files: [
+      {
+        name: "app.js",
+        code: `// Analytics — fire-and-forget. Never blocks UI.
+
+function track(type, data = {}) {
+  if (!isSaving()) return;  // privacy gate
+  const body = JSON.stringify({ type, ...data, ts: Date.now() });
+  apiHeaders()
+    .then(h => fetch("/api/event",
+      { method: "POST", headers: h, body }))
+    .catch(() => {});  // errors swallowed — analytics never breaks UX
+}
+
+// Events fired throughout the app:
+track("page_load");                            // on startup
+track("lesson_open",     { lesson: id });      // entering a lesson
+track("seed_click",      { text: "..." });     // clicking a seed question
+track("start_learning",  { lesson, mode });    // "start learning" button
+track("user_msg",        { lesson, text });    // student sends a message
+track("tutor_reply",     { lesson, text });    // AI responds
+track("phase_change",    { lesson, phase });   // explore → learn → done
+track("lesson_complete", { lesson: id });      // AI says [LESSON_COMPLETE]
+track("back_home",       { from_lesson });     // returning to home
+track("mode_toggle",     { mode });            // quick ↔ deep
+track("lang_toggle",     { lang });            // language change
+track("feedback",        { text, lesson });    // sending feedback`,
+      },
+      {
+        name: "serve.py",
+        code: `# POST /api/event — only log when student opted in.
+# Defense-in-depth: server checks X-Mode even though
+# the client already gates on isSaving().
+
+if self.headers.get("X-Mode", "") != "saving":
+    self._json_response(200, {"ok": True})  # silently discard
+    return
+
+if not check_rate("event", get_real_ip(self)):
+    self._json_response(429, {"error": "rate limit exceeded"})
+    return
+
+evt_data = json.loads(body)
+uid = self.headers.get("X-UID", "")
+
+# First event? Record consent timestamp (GDPR proof).
+with _lock:
+    users = load_users()
+    now = int(time.time() * 1000)
+    if uid not in users:
+        users[uid] = {"first_seen": now, "consent_ts": now}
+        save_users(users)
+    elif "consent_ts" not in users[uid]:
+        users[uid]["consent_ts"] = now
+        save_users(users)
+
+# Append to per-user JSONL file
+event_file = os.path.join(DATA_DIR, f"{uid}.jsonl")
+with _lock:
+    with open(event_file, "a") as f:
+        f.write(json.dumps(evt_data) + "\\n")`,
+      },
+      {
+        name: "data/example.jsonl",
+        code: `// Per-user event file: data/{uid}.jsonl
+// Each line is one JSON object. Append-only.
+
+{"type":"page_load","ts":1775074441949}
+{"type":"lesson_open","lesson":"c-pointers","ts":1775074445123}
+{"type":"start_learning","lesson":"c-pointers","mode":"quick","ts":1775074460000}
+{"type":"user_msg","lesson":"c-pointers","text":"I think &x gives the address","ts":1775074475000}
+{"type":"tutor_reply","lesson":"c-pointers","text":"Exactly!...","ts":1775074477000}
+{"type":"lesson_complete","lesson":"c-pointers","ts":1775074490000}
+{"type":"back_home","from_lesson":"c-pointers","ts":1775074495000}
+
+// Why JSONL instead of a database?
+// - Zero setup: just append a line
+// - GDPR delete: rm the file
+// - No schema migrations ever
+// - Trade-off: no queries, no joins, no indexes`,
+      },
+    ],
+    seedQuestions: [
+      "Why does track() swallow errors instead of showing them?",
+      "Why does the server also check X-Mode if the client already gates on isSaving()?",
+      "What is consent_ts used for and when does it get recorded?",
+      "What's the trade-off of JSONL versus a database for event storage?",
+    ],
+  },
+
+  {
+    id: "meta-feedback",
+    title: "Collecting User Feedback",
+    difficulty: "Project",
+    icon: "✉️",
+    description:
+      "A banner says 'share your feedback!' — clicking it opens a modal. Feedback goes to /api/feedback and is stored in a global _feedback.jsonl file (separate from per-user data). The modal shows a brief confirmation animation before auto-closing.",
+    concepts: [
+      "Banner at the top triggers the feedback modal on click",
+      "Feedback stored in _feedback.jsonl — global file, not per-user",
+      "Modal: overlay + centered card, closes on backdrop click or cancel",
+      "Also tracked as a 'feedback' event in the user's own timeline (if saving)",
+      "Rate-limited under the 'mutate' bucket (30/hour) to prevent spam",
+    ],
+    bridges: {
+      Python: "The backend is a simple POST handler — validate text, cap at 5000 chars, append to file.",
+      JavaScript: "innerHTML replacement for the confirmation animation — no framework needed.",
+      Java: "Like a dialog fragment — show form, capture input, POST, dismiss with thank-you.",
+    },
+    files: [
+      {
+        name: "app.js",
+        code: `// Banner click opens the feedback modal.
+$("#proto-banner").addEventListener("click", openFeedback);
+
+function openFeedback() {
+  const modal = $("#feedback-modal");
+  const inner = modal.firstElementChild;
+  inner.innerHTML = feedbackFormHTML;  // reset to form
+  modal.classList.remove("hidden");
+  $("#feedback-text").focus();
+
+  // Cancel: just close
+  $("#feedback-cancel").addEventListener("click",
+    () => modal.classList.add("hidden"));
+
+  // Send: POST to server, show confirmation
+  $("#feedback-send").addEventListener("click", () => {
+    const text = $("#feedback-text").value.trim();
+    if (!text) return;
+
+    const data = { text, lesson: state.lesson?.id || null };
+    apiHeaders()
+      .then(h => fetch("/api/feedback", {
+        method: "POST", headers: h,
+        body: JSON.stringify(data),
+      })).catch(() => {});
+    track("feedback", data);  // also log in user timeline
+
+    // Confirmation animation, then auto-close
+    inner.innerHTML = \`
+      <div style="text-align:center;padding:24px">
+        <div style="font-size:32px">&#10003;</div>
+        <div style="font-weight:600">Feedback sent!</div>
+      </div>\`;
+    setTimeout(() => modal.classList.add("hidden"), 2400);
+  });
+}
+
+// Close on backdrop click (outside the card)
+$("#feedback-modal").addEventListener("click", (e) => {
+  if (e.target === $("#feedback-modal"))
+    $("#feedback-modal").classList.add("hidden");
+});`,
+      },
+      {
+        name: "serve.py",
+        code: `# POST /api/feedback — global file, not per-user.
+# Rate-limited under "mutate" bucket (30/hour).
+
+MAX_FEEDBACK_LEN = 5000
+
+# In _handle_feedback:
+if not check_rate("mutate", get_real_ip(self)):
+    return self._json_response(429, {"error": "rate limit exceeded"})
+
+data = json.loads(self.rfile.read(length))
+text = data.get("text", "").strip()
+
+if not text:
+    return self._json_response(400, {"error": "text required"})
+if len(text) > MAX_FEEDBACK_LEN:
+    return self._json_response(413, {"error": "feedback too long"})
+
+record = {
+    "ts": int(time.time() * 1000),
+    "text": text,
+    "lesson": data.get("lesson"),  # which lesson, or null
+}
+with _lock:
+    with open("data/_feedback.jsonl", "a") as f:
+        f.write(json.dumps(record) + "\\n")
+
+# To read all feedback:
+#   cat data/_feedback.jsonl | python3 -m json.tool
+# Each line: {"ts": ..., "text": "...", "lesson": "c-pointers"}`,
+      },
+    ],
+    seedQuestions: [
+      "Why store feedback in a global file instead of per-user files?",
+      "Why does the modal close on backdrop click but not on card click?",
+      "How does rate limiting on 'mutate' protect against feedback spam?",
+      "Why track feedback as both a /api/feedback POST and a track() event?",
+    ],
+  },
+
+  {
+    id: "meta-dashboard",
+    title: "The Analytics Dashboard",
+    difficulty: "Project",
+    icon: "📊",
+    description:
+      "A two-panel admin view: users on the left (sorted by last activity), their event timeline on the right. Protected by DASHBOARD_SECRET in the URL. Color-coded events show the full learning journey — from page load to lesson completion.",
+    concepts: [
+      "Access: /dashboard/<SECRET> — constant-time comparison via hmac.compare_digest",
+      "User list: /api/users returns UID prefix, consent time, event count, last active",
+      "'Hide <2 events' filters out bots and accidental visitors",
+      "Timeline: /api/timeline returns chronological events for one user",
+      "12 event types, each with a distinct color (green=completion, purple=tutor, etc.)",
+    ],
+    bridges: {
+      Python: "The backend reads JSONL files on demand — no database, just file scanning.",
+      JavaScript: "Vanilla JS: template literals generate HTML, event listeners handle clicks.",
+      Java: "Like a simple admin panel — two-pane master-detail layout.",
+    },
+    files: [
+      {
+        name: "dashboard.js",
+        code: `// Dashboard secret extracted from the URL path.
+// /dashboard/abc123 → dashKey = "abc123"
+const dashKey = location.pathname.split("/").pop();
+let currentUID = null;
+
+async function loadUsers() {
+  // "hide <2 events" filters bots (they generate 0-1 events)
+  const minEv = document.getElementById("hide-bots").checked ? 2 : 0;
+  const resp = await fetch(
+    \`/api/users?key=\${dashKey}&min_events=\${minEv}\`);
+  const users = await resp.json();
+
+  // Render clickable user list
+  el.innerHTML = users.map(u => \`
+    <div class="user-item" data-uid="\${u.uid}">
+      <div class="user-id">\${u.uid.slice(0, 8)}</div>
+      <div class="user-meta">
+        consented \${u.consent_ts ? relTime(u.consent_ts) : "—"}
+      </div>
+      <div class="user-stats">
+        <span>\${u.events} events</span>
+        <span>\${u.last_ts ? relTime(u.last_ts) : "—"}</span>
+      </div>
+    </div>\`).join("");
+
+  // Click a user → load their timeline
+  el.querySelectorAll(".user-item").forEach(item =>
+    item.addEventListener("click", () => {
+      currentUID = item.dataset.uid;
+      loadTimeline(currentUID);
+    })
+  );
+}
+
+async function loadTimeline(uid) {
+  const resp = await fetch(
+    \`/api/timeline?key=\${dashKey}&uid=\${uid}\`);
+  const events = await resp.json();
+
+  // Each event: colored dot + type + optional detail/text
+  el.innerHTML = events.map(evt => \`
+    <div class="event ev-\${evt.type}">
+      <div class="event-time">\${relTime(evt.ts)}</div>
+      <div class="event-dot"></div>
+      <div class="event-body">
+        <div class="event-type">\${evt.type}</div>
+        \${evt.lesson ? \`<div class="event-detail">\${esc(evt.lesson)}</div>\` : ""}
+        \${evt.text ? \`<div class="event-text">\${esc(evt.text)}</div>\` : ""}
+      </div>
+    </div>\`).join("");
+}`,
+      },
+      {
+        name: "serve.py — dashboard endpoints",
+        code: `# Dashboard auth: constant-time secret comparison.
+# Secret is in the URL path or query string.
+
+def _dashboard_ok(self):
+    supplied = params.get("key", "")
+    if not supplied and self.path.startswith("/dashboard/"):
+        supplied = self.path.split("/dashboard/", 1)[1]
+    return hmac.compare_digest(supplied, DASHBOARD_SECRET)
+
+# GET /api/users?key=SECRET&min_events=2
+# Scans _users.json + counts events in each {uid}.jsonl
+# Returns: [{uid, first_seen, consent_ts, events, last_ts}]
+# Sorted by last activity (most recent first).
+
+# GET /api/timeline?key=SECRET&uid=UUID
+# Returns every line from {uid}.jsonl as JSON objects.
+
+# DASHBOARD_SECRET is auto-generated on first deploy:
+#   ensure_secret DASHBOARD_SECRET  (in deploy/setup.sh)
+# For local dev, serve.py generates a random one and prints it.`,
+      },
+      {
+        name: "event_colors.css",
+        code: `/* Each event type has a distinct color for scanning.
+   Semantics:
+   Green  = positive (start_learning, lesson_complete)
+   Blue   = information (lesson_open, user_msg)
+   Purple = AI activity (tutor_reply)
+   Orange = state change (phase_change)
+   Yellow = exploration (seed_click, copy_prompt)
+   Pink   = feedback (with glow effect)
+   Dim    = navigation (page_load, back_home) */
+
+.ev-lesson_open     .event-dot { background: #4a9eff; }
+.ev-start_learning  .event-dot { background: #5cb85c; }
+.ev-user_msg        .event-dot { background: #5599dd; }
+.ev-tutor_reply     .event-dot { background: #9b6ed8; }
+.ev-phase_change    .event-dot { background: #e8883a; }
+.ev-lesson_complete .event-dot {
+  background: #5cb85c;
+  box-shadow: 0 0 6px #5cb85c;  /* glow */
+}
+.ev-feedback        .event-dot {
+  background: #e84aff;
+  box-shadow: 0 0 6px #e84aff;  /* glow */
+}
+.ev-back_home       .event-dot { background: #888; }`,
+      },
+    ],
+    seedQuestions: [
+      "Why use a URL secret instead of a login form for the dashboard?",
+      "What does 'hide <2 events' filter out and why is it useful?",
+      "How can you tell from the timeline whether a student struggled or breezed through?",
+      "Why is the DASHBOARD_SECRET auto-generated on first deploy?",
+    ],
+  },
 ] };

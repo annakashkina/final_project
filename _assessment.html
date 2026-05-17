@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{TITLE}}</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="style.css?v=8">
+  <link id="hljs-light" rel="stylesheet"
+        href="vendor/highlight.js/styles/github.min.css">
+  <link id="hljs-dark" rel="stylesheet" disabled
+        href="vendor/highlight.js/styles/github-dark.min.css">
+  <script src="vendor/highlight.js/highlight.min.js"></script>
+  <style>
+    .assess-wrap {
+      max-width: 740px;
+      margin: 0 auto;
+      padding: 20px 16px;
+    }
+    .progress-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    .progress-text {
+      font-size: 12px;
+      color: var(--dim);
+      white-space: nowrap;
+      font-family: var(--mono);
+    }
+    .progress-track {
+      flex: 1;
+      height: 4px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: var(--accent);
+      transition: width 0.3s ease;
+      border-radius: 2px;
+    }
+
+    .q-code {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+    .q-code .panel-bar {
+      display: flex;
+      align-items: center;
+      padding: 4px 10px;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel-bar);
+    }
+    .q-code .file-tab {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--accent);
+      padding: 4px 8px;
+    }
+    .q-code pre {
+      margin: 0;
+      padding: 0;
+      overflow: auto;
+      font-size: 13px;
+      line-height: 1.35;
+      max-height: 320px;
+    }
+    .q-code pre code,
+    .q-code pre code.hljs {
+      font-family: var(--mono);
+      display: block;
+      padding: 8px 12px 8px 0;
+      line-height: 1.35 !important;
+      font-size: 13px !important;
+    }
+
+    .q-prompt {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      line-height: 1.5;
+    }
+
+    #q-answer {
+      width: 100%;
+      min-height: 80px;
+      padding: 10px 12px;
+      background: var(--surface);
+      border: 2px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 14px;
+      resize: vertical;
+      line-height: 1.5;
+      margin-bottom: 8px;
+    }
+    #q-answer:focus { outline: none; border-color: var(--accent); }
+    #q-answer:disabled { opacity: 0.6; }
+
+    .q-hint {
+      font-size: 11px;
+      color: var(--dim);
+      margin-bottom: 12px;
+    }
+
+    .q-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+      align-items: center;
+    }
+    .q-actions .btn-primary { padding: 10px 24px; font-size: 14px; }
+
+    /* Feedback */
+    .q-feedback {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 14px 16px;
+      margin-bottom: 16px;
+    }
+    .fb-score {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .fb-num {
+      font-size: 20px;
+      font-weight: 700;
+      font-family: var(--mono);
+    }
+    .fb-label {
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .fb-text {
+      font-size: 13px;
+      color: var(--dim);
+      line-height: 1.5;
+    }
+
+    /* Results */
+    .results-card {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+    .results-score {
+      font-size: 48px;
+      font-weight: 700;
+      color: var(--accent);
+      line-height: 1;
+    }
+    .results-label {
+      font-size: 13px;
+      color: var(--dim);
+      margin-top: 6px;
+    }
+    .results-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .result-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 14px;
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+    .result-score-badge {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; font-weight: 700; color: #fff;
+      flex-shrink: 0;
+    }
+    .result-body { flex: 1; min-width: 0; }
+    .result-concept { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+    .result-answer {
+      font-size: 12px;
+      color: var(--text);
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 6px 8px;
+      margin-bottom: 6px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 80px;
+      overflow-y: auto;
+    }
+    .result-feedback { font-size: 12px; color: var(--dim); }
+    .results-actions { display: flex; justify-content: center; margin-top: 20px; }
+
+    /* Consent */
+    .consent-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 24px;
+      max-width: 520px;
+      margin: 40px auto;
+      text-align: center;
+    }
+    .consent-box h2 { font-size: 18px; margin-bottom: 12px; }
+    .consent-box p { font-size: 13px; color: var(--dim); margin-bottom: 16px; line-height: 1.6; }
+    .consent-label {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-size: 13px;
+      margin-bottom: 16px;
+      cursor: pointer;
+    }
+    .consent-label input { accent-color: var(--green); width: 16px; height: 16px; }
+  </style>
+</head>
+<body>
+
+  <header id="header">
+    <div class="header-left">
+      <a href="/" class="logo">codeprobe</a>
+      <span class="header-flow" id="assess-title"></span>
+    </div>
+    <button id="theme-toggle" class="theme-toggle" title="Toggle theme"></button>
+  </header>
+
+  <div class="assess-wrap">
+
+    <!-- Consent screen -->
+    <div id="consent-screen">
+      <div class="consent-box">
+        <h2 id="consent-heading">Comprehension Test</h2>
+        <p id="consent-desc">
+          8 questions about C programming, takes about 10–20 minutes. Read the code, explain what it does in your own words.<br><br>
+          An AI will give you instant feedback on each answer. Your responses will be recorded anonymously for a study on learning effectiveness.
+        </p>
+        <label class="consent-label">
+          <input type="checkbox" id="consent-check">
+          <span>I agree to participate and have my answers recorded</span>
+        </label>
+        <button id="consent-start" class="btn-primary" disabled>Begin test</button>
+      </div>
+    </div>
+
+    <!-- Quiz screen -->
+    <div id="quiz-screen" class="hidden">
+      <div class="progress-row">
+        <span class="progress-text" id="progress-text"></span>
+        <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
+      </div>
+      <div class="q-code">
+        <div class="panel-bar"><span class="file-tab" id="q-filename"></span></div>
+        <pre><code id="q-code-display" class="language-c"></code></pre>
+      </div>
+      <div class="q-prompt" id="q-prompt"></div>
+      <textarea id="q-answer" placeholder="Type your answer here..."></textarea>
+      <div class="q-hint">Ctrl+Enter to submit</div>
+      <div id="q-feedback" class="q-feedback hidden"></div>
+      <div class="q-actions">
+        <button id="q-submit" class="btn-primary">Submit answer</button>
+        <button id="q-next" class="btn-primary hidden">Next question</button>
+      </div>
+    </div>
+
+    <!-- Results screen -->
+    <div id="results-screen" class="hidden">
+      <div class="results-card">
+        <div class="results-score" id="results-score"></div>
+        <div class="results-label" id="results-label"></div>
+      </div>
+      <div id="results-next-step"></div>
+      <div class="results-list" id="results-list"></div>
+      <div class="results-actions" id="results-actions">
+        <a href="/" class="btn-secondary">Back to codeprobe</a>
+      </div>
+    </div>
+
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+  <script type="module" src="assessment_app.js?v=3"></script>
+</body>
+</html>

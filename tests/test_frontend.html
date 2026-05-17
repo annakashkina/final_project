@@ -18,9 +18,10 @@
   <h1>codeprobe frontend tests</h1>
   <pre id="output"></pre>
   <div id="summary"></div>
-  <script src="test_frontend.js"></script>
-  <script>
-    const r = window._testReport();
+  <script type="module" src="test_frontend.js"></script>
+  <script type="module">
+    import { _testReport } from "./test_frontend.js";
+    const r = _testReport();
     const out = document.getElementById("output");
     for (const line of r.text.split("\n")) {
       const span = document.createElement("span");

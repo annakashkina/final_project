@@ -77,6 +77,20 @@ async function loadTimeline(uid) {
       if (type === "start_learning" && evt.questions) text = evt.questions;
       if (type === "feedback" && evt.text) text = evt.text;
 
+      if (type === "assessment_start") detail = `${evt.assessment} | ${evt.group || "?"} | form ${evt.form || "?"}`;
+      if (type === "assessment_answer") {
+        const s = evt.score !== null && evt.score !== undefined ? `${evt.score}/3` : "?";
+        detail = `${s} — ${evt.concept}`;
+        if (evt.answer) text = evt.answer;
+      }
+      if (type === "assessment_complete") {
+        detail = `${evt.assessment} | ${evt.group || "?"}: ${evt.score}/${evt.maxScore} (${evt.pct}%)`;
+        if (evt.durationMs) detail += ` in ${Math.round(evt.durationMs / 1000)}s`;
+        if (evt.answers) {
+          text = evt.answers.map(a => `${a.score ?? "?"}/3 ${a.concept}`).join("\n");
+        }
+      }
+
       return `
         <div class="event ev-${type}">
           <div class="event-time" title="${absTime(evt.ts)}">${relTime(evt.ts)}</div>

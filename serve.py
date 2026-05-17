@@ -60,6 +60,45 @@ LLM_HEADERS = {"Content-Type": "application/json", "User-Agent": "CodeProbe/1.0"
 if LLM_API_KEY:
     LLM_HEADERS["Authorization"] = f"Bearer {LLM_API_KEY}"
 
+# Fallback LLM (used when primary returns 429). URL/MODEL default to primary's
+# so a different key on the same provider just works.
+LLM_FALLBACK_API_KEY = os.environ.get("LLM_FALLBACK_API_KEY", "")
+LLM_FALLBACK_API_URL = os.environ.get("LLM_FALLBACK_API_URL") or LLM_API_URL
+LLM_FALLBACK_MODEL = os.environ.get("LLM_FALLBACK_MODEL") or LLM_MODEL
+LLM_FALLBACK_HEADERS = {"Content-Type": "application/json", "User-Agent": "CodeProbe/1.0"}
+if LLM_FALLBACK_API_KEY:
+    LLM_FALLBACK_HEADERS["Authorization"] = f"Bearer {LLM_FALLBACK_API_KEY}"
+
+
+def _llm_call(messages, llm_extra, use_fallback=False):
+    """Call the LLM once. Returns (reply, error_info, model_used)."""
+    if use_fallback:
+        api_url, headers, model, label = LLM_FALLBACK_API_URL, LLM_FALLBACK_HEADERS, LLM_FALLBACK_MODEL, "fallback"
+    else:
+        api_url, headers, model, label = LLM_API_URL, LLM_HEADERS, LLM_MODEL, "primary"
+    payload = json.dumps({
+        "model": model,
+        "messages": messages,
+        "temperature": 0.7,
+        "stream": False,
+        **llm_extra,
+    }).encode()
+    req = urllib.request.Request(api_url, data=payload, headers=headers)
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            result = json.loads(resp.read())
+            return result["choices"][0]["message"]["content"], None, model
+    except urllib.error.HTTPError as e:
+        try:
+            err_body = e.read().decode(errors="replace")
+            print(f"LLM API ({label}) error status={e.code} body={err_body[:500]}", file=sys.stderr)
+        except Exception:
+            print(f"LLM API ({label}) error status={e.code}", file=sys.stderr)
+        return None, (e.code, "upstream error"), model
+    except Exception as e:
+        print(f"LLM API ({label}) error: {type(e).__name__}: {e}", file=sys.stderr)
+        return None, (500, "upstream error"), model
+
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 USERS_FILE = os.path.join(DATA_DIR, "_users.json")
 
@@ -173,6 +212,22 @@ def _discover_tracks():
 _PAGES = _discover_tracks()
 
 
+def _discover_assessments():
+    base = os.path.dirname(os.path.abspath(__file__))
+    tpl_path = os.path.join(base, "_assessment.html")
+    if not os.path.exists(tpl_path):
+        return {}
+    with open(tpl_path) as f:
+        tpl = f.read()
+    pages = {}
+    page = tpl.replace("{{TITLE}}", "C Comprehension Test")
+    pages["/assessment"] = page.encode()
+    return pages
+
+
+_PAGES.update(_discover_assessments())
+
+
 def valid_uid(uid):
     return bool(_UUID_RE.match(uid))
 
@@ -240,7 +295,7 @@ def validate_messages(messages):
     """Validate chat messages array. Returns error string or None."""
     if not isinstance(messages, list) or len(messages) == 0:
         return "messages must be a non-empty array"
-    if len(messages) > 20:
+    if len(messages) > 60:
         return "too many messages"
     allowed_roles = {"system", "user", "assistant"}
     system_count = 0
@@ -491,14 +546,18 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             super().do_GET()
 
     def do_POST(self):
+        length = int(self.headers.get("Content-Length", 0))
+
         ua = self.headers.get("User-Agent", "")
         if is_bot(ua):
+            if length:
+                self.rfile.read(length)  # drain body for HTTP/1.1 keep-alive
             self._json_response(403, {"error": "forbidden"})
             return
 
-        # Body size limit
-        length = int(self.headers.get("Content-Length", 0))
         if length > MAX_BODY:
+            # Don't try to drain a huge body — just close the connection.
+            self.close_connection = True
             self._json_response(413, {"error": "request too large"})
             return
 
@@ -525,11 +584,15 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         # All other /api/* endpoints require a valid token
         if self.path.startswith("/api/"):
             if not verify_token(uid, token):
+                if length:
+                    self.rfile.read(length)  # drain body for HTTP/1.1 keep-alive
                 self._json_response(403, {"error": "invalid token"})
                 return
 
         if self.path == "/api/chat":
             if not check_rate("chat", get_real_ip(self)):
+                if length:
+                    self.rfile.read(length)
                 self._json_response(429, {"error": "rate limit exceeded"})
                 return
             try:
@@ -555,41 +618,20 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             if UNSLOTH_PASSWORD:
                 llm_extra["enable_thinking"] = False
 
-            payload = json.dumps({
-                "model": LLM_MODEL,
-                "messages": msgs,
-                "temperature": 0.7,
-                "max_tokens": 1500,
-                "stream": False,
-                **llm_extra,
-            }).encode()
+            # First attempt on primary
+            reply, error_info, used_model = _llm_call(msgs, llm_extra, use_fallback=False)
 
-            req = urllib.request.Request(
-                LLM_API_URL,
-                data=payload,
-                headers=LLM_HEADERS,
-            )
-
-            # First attempt
-            reply = None
-            error_info = None
-            try:
-                with urllib.request.urlopen(req, timeout=10) as resp:
-                    result = json.loads(resp.read())
-                    reply = result["choices"][0]["message"]["content"]
-            except urllib.error.HTTPError as e:
-                try:
-                    body = e.read().decode(errors="replace")
-                    print(f"LLM API error status={e.code} body={body[:500]}", file=sys.stderr)
-                except Exception:
-                    print(f"LLM API error status={e.code}", file=sys.stderr)
-                error_info = (e.code, "upstream error")
-            except Exception as e:
-                error_info = (500, "upstream error")
-                print(f"LLM API error: {type(e).__name__}", file=sys.stderr)
+            # On 429, switch to fallback for the rest of this request
+            use_fallback = False
+            if error_info and error_info[0] == 429 and LLM_FALLBACK_API_KEY:
+                print("LLM API: primary rate-limited, switching to fallback", file=sys.stderr)
+                use_fallback = True
+                reply, error_info, used_model = _llm_call(msgs, llm_extra, use_fallback=True)
 
             # Retry once if error or too-short reply (~50 tokens ≈ 40 words)
-            needs_retry = error_info is not None or (reply is not None and len(reply.split()) < 40)
+            # Skip short-reply check when caller expects a short response (e.g. assessment grading)
+            expect_short = body.get("expect_short", False)
+            needs_retry = error_info is not None or (not expect_short and reply is not None and len(reply.split()) < 40)
             used_messages = body["messages"]
 
             if needs_retry:
@@ -598,7 +640,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                     chat_file = os.path.join(DATA_DIR, f"{uid}_chat.jsonl")
                     failed_record = {
                         "ts": int(time.time() * 1000),
-                        "model": LLM_MODEL,
+                        "model": used_model,
                         "messages": body["messages"],
                         "reply": reply,
                         "error": error_info[1] if error_info else None,
@@ -621,41 +663,22 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
                 # Retry after 1s with trailing space on last message to avoid caching
                 time.sleep(1)
-                msgs = [dict(m) for m in body["messages"]]
-                if UNSLOTH_PASSWORD and len(msgs) == 1 and msgs[0]["role"] == "system":
-                    msgs.append({"role": "user", "content": "Begin."})
-                if msgs:
-                    msgs[-1]["content"] += " "
+                retry_msgs = [dict(m) for m in body["messages"]]
+                if UNSLOTH_PASSWORD and len(retry_msgs) == 1 and retry_msgs[0]["role"] == "system":
+                    retry_msgs.append({"role": "user", "content": "Begin."})
+                if retry_msgs:
+                    retry_msgs[-1]["content"] += " "
 
-                retry_payload = json.dumps({
-                    "model": LLM_MODEL,
-                    "messages": msgs,
-                    "temperature": 0.7,
-                    "max_tokens": 1500,
-                    "stream": False,
-                    **llm_extra,
-                }).encode()
-                retry_req = urllib.request.Request(
-                    LLM_API_URL,
-                    data=retry_payload,
-                    headers=LLM_HEADERS,
-                )
-                try:
-                    with urllib.request.urlopen(retry_req, timeout=10) as resp:
-                        result = json.loads(resp.read())
-                        reply = result["choices"][0]["message"]["content"]
-                        error_info = None
-                        used_messages = msgs
-                except urllib.error.HTTPError as e:
-                    try:
-                        body = e.read().decode(errors="replace")
-                        print(f"LLM retry error status={e.code} body={body[:500]}", file=sys.stderr)
-                    except Exception:
-                        print(f"LLM retry error status={e.code}", file=sys.stderr)
-                    error_info = (e.code, "upstream error")
-                except Exception as e:
-                    error_info = (500, "upstream error")
-                    print(f"LLM retry error: {type(e).__name__}: {e}", file=sys.stderr)
+                reply, error_info, used_model = _llm_call(retry_msgs, llm_extra, use_fallback=use_fallback)
+
+                # If the retry hit 429 on primary, give fallback one shot
+                if error_info and error_info[0] == 429 and not use_fallback and LLM_FALLBACK_API_KEY:
+                    print("LLM API: retry rate-limited on primary, switching to fallback", file=sys.stderr)
+                    use_fallback = True
+                    reply, error_info, used_model = _llm_call(retry_msgs, llm_extra, use_fallback=True)
+
+                if not error_info:
+                    used_messages = retry_msgs
 
             # Return error if still failing after retry
             if error_info:
@@ -674,7 +697,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 chat_file = os.path.join(DATA_DIR, f"{uid}_chat.jsonl")
                 chat_record = {
                     "ts": int(time.time() * 1000),
-                    "model": LLM_MODEL,
+                    "model": used_model,
                     "messages": used_messages,
                     "reply": reply,
                 }
@@ -773,6 +796,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self._json_response(200, {"ok": True})
 
         else:
+            if length:
+                self.rfile.read(length)  # drain body for HTTP/1.1 keep-alive
             self.send_response(404)
             self.send_header("Content-Length", "0")
             self.end_headers()
@@ -848,6 +873,9 @@ if __name__ == "__main__":
         print(f"Dashboard at http://localhost:{port}/dashboard/<DASHBOARD_SECRET={preview}>")
     print(f"Using model: {LLM_MODEL}")
     print(f"API: {LLM_API_URL}")
+    if LLM_FALLBACK_API_KEY:
+        print(f"Fallback model: {LLM_FALLBACK_MODEL}")
+        print(f"Fallback API: {LLM_FALLBACK_API_URL}")
     schedule_cleanup()
     server = http.server.ThreadingHTTPServer(("", port), Handler)
     server.request_queue_size = 64
