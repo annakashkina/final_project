@@ -179,8 +179,8 @@ const currentForm = phase === "pre" ? assignment.preForm : assignment.postForm;
 const questions = currentForm.questions;
 const formLabel = phase === "pre" ? assignment.preLabel : assignment.postLabel;
 
-const SCORE_LABELS = ["No understanding", "Partial understanding", "Mostly correct", "Fully correct"];
-const SCORE_COLORS = ["var(--red)", "var(--orange)", "var(--yellow)", "var(--green)"];
+const SCORE_LABELS = ["Not yet", "Getting there", "Mostly there", "Solid"];
+const SCORE_COLORS = ["var(--dim)", "var(--orange)", "var(--yellow)", "var(--green)"];
 
 // --- State ---
 const state = {
@@ -418,7 +418,6 @@ $("#q-submit").addEventListener("click", async () => {
   if (result.score !== null) {
     fb.innerHTML = `
       <div class="fb-score" style="color:${SCORE_COLORS[result.score]}">
-        <span class="fb-num">${result.score}/3</span>
         <span class="fb-label">${SCORE_LABELS[result.score]}</span>
       </div>
       <div class="fb-text">${escHTML(result.feedback)}</div>`;
@@ -478,23 +477,27 @@ function finishQuiz() {
   $("#results-screen").classList.remove("hidden");
 
   const phaseTitle = phase === "pre" ? "Pre-test" : "Post-test";
-  $("#results-score").textContent = `${total}/${max}`;
-  $("#results-label").textContent = `${phaseTitle} \u2014 ${pct}% (preliminary, graded by AI)`;
-
-  const list = $("#results-list");
-  list.innerHTML = state.answers.map(a => {
-    const scoreColor = a.score !== null ? SCORE_COLORS[a.score] : "var(--dim)";
-    const scoreText = a.score !== null ? `${a.score}/3 \u2014 ${SCORE_LABELS[a.score]}` : "Pending";
-    return `
-      <div class="result-item">
-        <div class="result-score-badge" style="background:${scoreColor}">${a.score ?? "?"}</div>
-        <div class="result-body">
-          <div class="result-concept">${escHTML(a.concept)}</div>
-          <div class="result-answer">${escHTML(a.answer)}</div>
-          <div class="result-feedback">${scoreText}${a.feedback ? " \u2014 " + escHTML(a.feedback) : ""}</div>
-        </div>
-      </div>`;
-  }).join("");
+  if (phase === "pre") {
+    $("#results-score").textContent = "\ud83c\udf89";
+    $("#results-label").textContent = "Part 1 complete \u2014 thank you. Your answers are recorded; you\u2019ll see your full results after part 2.";
+    $("#results-list").innerHTML = "";
+  } else {
+    $("#results-score").textContent = `${total}/${max}`;
+    $("#results-label").textContent = `${phaseTitle} \u2014 ${pct}% (preliminary, graded by AI)`;
+    $("#results-list").innerHTML = state.answers.map(a => {
+      const scoreColor = a.score !== null ? SCORE_COLORS[a.score] : "var(--dim)";
+      const scoreText = a.score !== null ? SCORE_LABELS[a.score] : "Pending";
+      return `
+        <div class="result-item">
+          <div class="result-score-badge" style="background:${scoreColor}"></div>
+          <div class="result-body">
+            <div class="result-concept">${escHTML(a.concept)}</div>
+            <div class="result-answer">${escHTML(a.answer)}</div>
+            <div class="result-feedback">${scoreText}${a.feedback ? " \u2014 " + escHTML(a.feedback) : ""}</div>
+          </div>
+        </div>`;
+    }).join("");
+  }
 
   // Show next-step CTA prominently above results
   const nextStep = $("#results-next-step");
@@ -519,11 +522,27 @@ function finishQuiz() {
         <p style="font-size:13px;color:var(--dim)">Same link: <a href="/assessment" target="_blank" style="color:var(--accent)">/assessment</a> \u2014 bookmark it now so you don\u2019t forget.</p>
       </div>`;
   } else {
-    nextStep.innerHTML = `
-      <div style="text-align:center;background:var(--surface);border:2px solid var(--green);border-radius:8px;padding:20px;margin-bottom:20px">
-        <p style="font-size:15px;font-weight:600;margin-bottom:8px">Study complete \u2014 thank you!</p>
-        <p style="color:var(--dim);font-size:13px">Your results help us improve the platform.</p>
-      </div>`;
+    let preData = {};
+    try { preData = JSON.parse(localStorage.getItem("codeprobe_assessment_pre_complete") || "{}"); } catch {}
+    const prePct = (preData && typeof preData.pct === "number") ? preData.pct : null;
+    const improved = prePct !== null && pct > prePct;
+    if (improved) {
+      const delta = pct - prePct;
+      nextStep.innerHTML = `
+        <div style="text-align:center;background:var(--surface);border:2px solid var(--green);border-radius:8px;padding:20px;margin-bottom:20px">
+          <p style="font-size:22px;margin-bottom:8px">\ud83c\udf89</p>
+          <p style="font-size:16px;font-weight:700;margin-bottom:6px">You improved!</p>
+          <p style="font-size:14px;margin-bottom:10px">Part 1: ${prePct}% \u2192 Part 2: ${pct}% &nbsp;(<strong style="color:var(--green)">+${delta} points</strong>)</p>
+          <p style="color:var(--dim);font-size:12px;line-height:1.5">AI grading is preliminary \u2014 final scores are reviewed more carefully later. Either way: both parts done, thank you for completing the study.</p>
+        </div>`;
+    } else {
+      nextStep.innerHTML = `
+        <div style="text-align:center;background:var(--surface);border:2px solid var(--green);border-radius:8px;padding:20px;margin-bottom:20px">
+          <p style="font-size:22px;margin-bottom:8px">\ud83d\ude4f</p>
+          <p style="font-size:15px;font-weight:600;margin-bottom:8px">Study complete \u2014 thank you.</p>
+          <p style="color:var(--dim);font-size:13px;line-height:1.5">Both parts done. Your results help me understand how people learn C \u2014 that's the whole point.</p>
+        </div>`;
+    }
   }
 
   $("#results-actions").innerHTML = `<a href="/" class="btn-secondary" style="text-decoration:none;display:inline-block">Back to codeprobe</a>`;
