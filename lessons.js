@@ -7,8 +7,6 @@ import { pythonLessons } from "./lessons/python.js";
 import { typescriptLessons } from "./lessons/typescript.js";
 import { rubyLessons } from "./lessons/ruby.js";
 import { cppLessons } from "./lessons/cpp.js";
-import { metaLessons } from "./lessons/meta.js";
-import { mlLessons } from "./lessons/ml.js";
 
 export const series = [
   cLessons,
@@ -17,8 +15,6 @@ export const series = [
   typescriptLessons,
   rubyLessons,
   cppLessons,
-  metaLessons,
-  mlLessons,
 ];
 
 export const lessons = series.flatMap(s => {

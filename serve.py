@@ -18,8 +18,10 @@ try:
 except ImportError:
     VALIDATOR_ENABLED = False
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 # Load .env file if present
-env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
+env_path = os.path.join(BASE_DIR, ".env")
 if os.path.exists(env_path):
     for line in open(env_path):
         line = line.strip()
@@ -99,7 +101,7 @@ def _llm_call(messages, llm_extra, use_fallback=False):
         print(f"LLM API ({label}) error: {type(e).__name__}: {e}", file=sys.stderr)
         return None, (500, "upstream error"), model
 
-DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+DATA_DIR = os.path.join(BASE_DIR, "data")
 USERS_FILE = os.path.join(DATA_DIR, "_users.json")
 
 # Bot protection
@@ -110,6 +112,7 @@ BOT_UA_RE = re.compile(
 )
 _UUID_RE = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
 _TOKEN_RE = re.compile(r'^[A-Za-z0-9_-]{32,64}$')
+_INVITE_PATH_RE = re.compile(r'^/invite/[A-Za-z0-9_-]{1,64}$')
 MAX_BODY = 256 * 1024  # 256KB
 MAX_FEEDBACK_LEN = 5000
 TRUSTED_PROXIES = {"127.0.0.1", "::1"}
@@ -139,11 +142,29 @@ STATIC_DENIED_FILES = {"_users.json", ".env", ".env.example", ".token_secret"}
 
 _TRACK_RE = re.compile(r'/\*\s*@codeprobe-track\s*\n(.*?)\*/', re.DOTALL)
 
+
+def _template_page(filename, title):
+    path = os.path.join(BASE_DIR, filename)
+    if not os.path.exists(path):
+        return None
+    with open(path) as f:
+        tpl = f.read()
+    return tpl.replace("{{TITLE}}", title).encode()
+
+
+def _template_pages(specs):
+    pages = {}
+    for route, filename, title in specs:
+        page = _template_page(filename, title)
+        if page:
+            pages[route] = page
+    return pages
+
+
 def _discover_tracks():
     """Scan lessons*.js for @codeprobe-track metadata, generate pages in memory."""
-    base = os.path.dirname(os.path.abspath(__file__))
-    track_tpl = os.path.join(base, "_track.html")
-    landing_tpl = os.path.join(base, "_landing.html")
+    track_tpl = os.path.join(BASE_DIR, "_track.html")
+    landing_tpl = os.path.join(BASE_DIR, "_landing.html")
     with open(track_tpl) as f:
         track_html = f.read()
     with open(landing_tpl) as f:
@@ -152,7 +173,7 @@ def _discover_tracks():
     pages = {}
     tracks = []
 
-    for path in sorted(glob.glob(os.path.join(base, "lessons*.js"))):
+    for path in sorted(glob.glob(os.path.join(BASE_DIR, "lessons*.js"))):
         fname = os.path.basename(path)
         # lessons.js → "default", lessons_foo.js → "foo"
         if fname == "lessons.js":
@@ -210,22 +231,11 @@ def _discover_tracks():
     return pages
 
 _PAGES = _discover_tracks()
-
-
-def _discover_assessments():
-    base = os.path.dirname(os.path.abspath(__file__))
-    tpl_path = os.path.join(base, "_assessment.html")
-    if not os.path.exists(tpl_path):
-        return {}
-    with open(tpl_path) as f:
-        tpl = f.read()
-    pages = {}
-    page = tpl.replace("{{TITLE}}", "C Comprehension Test")
-    pages["/assessment"] = page.encode()
-    return pages
-
-
-_PAGES.update(_discover_assessments())
+_PAGES.update(_template_pages((
+    ("/assessment", "_assessment.html", "C Comprehension Test"),
+    ("/study", "_study.html", "C Comprehension Test"),
+)))
+_INVITE_PAGE = _template_page("_invite.html", "CodeProbe Invite")
 
 
 def valid_uid(uid):
@@ -238,6 +248,10 @@ def is_bot(ua):
 
 def valid_token(tok):
     return bool(tok) and bool(_TOKEN_RE.match(tok))
+
+
+def valid_invite_path(path):
+    return bool(_INVITE_PATH_RE.match(path))
 
 
 def mint_token():
@@ -430,7 +444,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             if not self._dashboard_ok():
                 self._json_response(403, {"error": "forbidden"})
                 return
-            dash_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dashboard.html")
+            dash_path = os.path.join(BASE_DIR, "dashboard.html")
             with open(dash_path, "rb") as f:
                 content = f.read()
             self.send_response(200)
@@ -523,7 +537,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self._json_response(200, result)
 
         elif self.path == "/privacy":
-            priv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "privacy.html")
+            priv_path = os.path.join(BASE_DIR, "privacy.html")
             if os.path.exists(priv_path):
                 with open(priv_path, "rb") as f:
                     content = f.read()
@@ -537,6 +551,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
         elif self.path.split("?")[0] in _PAGES:
             self._serve_page_route()
+
+        elif valid_invite_path(self.path.split("?", 1)[0]):
+            self._serve_html(_INVITE_PAGE)
 
         else:
             rel = self.path.split("?", 1)[0].lstrip("/")
@@ -805,7 +822,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def _serve_page_route(self):
         """Serve a generated HTML page from memory."""
         route = self.path.split("?")[0]
-        content = _PAGES.get(route)
+        self._serve_html(_PAGES.get(route))
+
+    def _serve_html(self, content):
         if not content:
             self.send_error(404)
             return
@@ -859,7 +878,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
 if __name__ == "__main__":
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 3000
-    os.chdir(os.path.dirname(os.path.abspath(__file__)))
+    os.chdir(BASE_DIR)
     print(f"codeprobe at http://localhost:{port}")
     if _DASHBOARD_SECRET_AUTOGEN:
         print(

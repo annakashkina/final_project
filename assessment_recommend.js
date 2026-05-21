@@ -12,7 +12,7 @@ export const CONCEPT_TO_LESSON = {
 
 export function recommendLesson(answers) {
   const partial = answers
-    .filter(a => a.score === 1 || a.score === 2)
+    .filter(a => a.score === 1)
     .map(a => CONCEPT_TO_LESSON[a.concept])
     .filter(Boolean);
 
@@ -29,6 +29,15 @@ export function recommendLesson(answers) {
   if (weak.length > 0) {
     weak.sort((a, b) => a.difficulty - b.difficulty);
     return weak[0];
+  }
+
+  const partial2 = answers
+    .filter(a => a.score === 2)
+    .map(a => CONCEPT_TO_LESSON[a.concept])
+    .filter(Boolean);
+  if (partial2.length > 0) {
+    partial2.sort((a, b) => b.difficulty - a.difficulty);
+    return partial2[0];
   }
 
   return { id: "s01a2-recursion", difficulty: 2, title: "Recursion & Trees" };

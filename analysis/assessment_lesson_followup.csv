@@ -1,0 +1,9 @@
+participant,uid_prefix,group,form,pre_pct,recommended_lesson,after_pre_events,after_pre_lesson_events,opened_any_lesson,started_any_lesson,completed_any_lesson,opened_recommended,started_recommended,completed_recommended
+C01,7ef6c61c,control,A,96,s01-write,0,0,False,False,False,False,False,False
+C02,13db08a9,treatment,B,42,s01-control-flow,0,0,False,False,False,False,False,False
+C03,5eab9c79,control,A,46,s01-write,0,0,False,False,False,False,False,False
+C04,77e953fd,treatment,B,42,s01-write,0,0,False,False,False,False,False,False
+C05,66ad8407,treatment,B,38,s01-ascii,3,2,True,False,False,True,False,False
+C06,c90363fc,treatment,B,25,s01-strings,0,0,False,False,False,False,False,False
+C07,4fc38ff5,treatment,B,88,s01a2-linked-list,10,8,True,True,False,False,False,False
+C08,6c5d2a32,treatment,B,17,s01-strings,0,0,False,False,False,False,False,False

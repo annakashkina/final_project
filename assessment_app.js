@@ -155,16 +155,51 @@ function hashUID(uid, salt) {
   return Math.abs(h);
 }
 
+function hasExistingAssessmentState() {
+  return !!(
+    localStorage.getItem("codeprobe_uid") ||
+    localStorage.getItem("codeprobe_assessment_pre_complete") ||
+    localStorage.getItem("codeprobe_assessment_post_complete") ||
+    localStorage.getItem("codeprobe_assessment_pre_session") ||
+    localStorage.getItem("codeprobe_assessment_post_session")
+  );
+}
+
+function getFormCounterbalanceForNewUser(uid) {
+  const key = "codeprobe_form_counterbalance";
+
+  const stored = localStorage.getItem(key);
+  if (stored === "0" || stored === "1") return Number(stored);
+
+  // Existing users must keep the old behavior exactly.
+  if (hasExistingAssessmentState()) return 0;
+
+  // New users get an extra independent A/B flip.
+  // Persist it so pre/post/reloads stay stable.
+  const bit = crypto.getRandomValues(new Uint8Array(1))[0] % 2;
+  localStorage.setItem(key, String(bit));
+  return bit;
+}
+
 function getAssignment() {
   const uid = getUID();
-  const aFirst = hashUID(uid, 1) % 2 === 0;
+
+  const baseAFirst = hashUID(uid, 1) % 2 === 0;
   const treatment = hashUID(uid, 2) % 2 === 0;
+
+  const formCounterbalance = getFormCounterbalanceForNewUser(uid);
+
+  // For existing users formCounterbalance is 0, so behavior is unchanged.
+  // For new users, 50% get their A/B order flipped independently of treatment.
+  const aFirst = formCounterbalance ? !baseAFirst : baseAFirst;
+
   return {
     preForm: aFirst ? formA : formB,
     postForm: aFirst ? formB : formA,
     preLabel: aFirst ? "A" : "B",
     postLabel: aFirst ? "B" : "A",
     group: treatment ? "treatment" : "control",
+    formCounterbalance,
   };
 }
 
@@ -337,7 +372,7 @@ function initQuiz() {
     const seed = seedFromUID(getUID());
     state.order = shuffle(questions.map((_, i) => i), seed + (phase === "post" ? 9999 : 0));
     state.startTime = Date.now();
-    track("assessment_start", { assessment: phase, form: formLabel, group: assignment.group, counterbalance: assignment.preLabel + "/" + assignment.postLabel });
+    track("assessment_start", { assessment: phase, form: formLabel, group: assignment.group, counterbalance: assignment.preLabel + "/" + assignment.postLabel, formCounterbalance: assignment.formCounterbalance });
   }
   renderQuestion();
 }
@@ -405,6 +440,7 @@ $("#q-submit").addEventListener("click", async () => {
     assessment: phase,
     form: formLabel,
     group: assignment.group,
+    formCounterbalance: assignment.formCounterbalance,
     questionId: q.id,
     concept: q.concept,
     answer,
@@ -463,6 +499,7 @@ function finishQuiz() {
     form: formLabel,
     group: assignment.group,
     counterbalance: assignment.preLabel + "/" + assignment.postLabel,
+    formCounterbalance: assignment.formCounterbalance,
     score: total,
     maxScore: max,
     pct,

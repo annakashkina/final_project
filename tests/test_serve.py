@@ -44,6 +44,14 @@ INVALID_UID = "not-a-uuid"
 DASHBOARD_SECRET = "test-dashboard-secret"
 
 
+class _ClosingHTTPConnection(http.client.HTTPConnection):
+    def request(self, method, url, body=None, headers=None, *, encode_chunked=False):
+        headers = dict(headers or {})
+        if not any(k.lower() == "connection" for k in headers):
+            headers["Connection"] = "close"
+        return super().request(method, url, body=body, headers=headers, encode_chunked=encode_chunked)
+
+
 def _fresh_data_dir():
     """Create a fresh temp data dir and point serve at it."""
     d = tempfile.mkdtemp(prefix="codeprobe_test_")
@@ -134,7 +142,7 @@ class TestValidateMessages(unittest.TestCase):
         assert serve.validate_messages("hello") is not None
 
     def test_too_many(self):
-        msgs = [{"role": "user", "content": f"msg {i}"} for i in range(21)]
+        msgs = [{"role": "user", "content": f"msg {i}"} for i in range(61)]
         assert serve.validate_messages(msgs) is not None
 
     def test_missing_role(self):
@@ -205,6 +213,16 @@ class TestStaticSafety(unittest.TestCase):
 
     def test_denied_specific_files(self):
         assert not serve._is_static_safe("_users.json")
+
+
+class TestInvitePath(unittest.TestCase):
+    def test_valid_invite_path(self):
+        assert serve.valid_invite_path("/invite/spring-2026_A")
+
+    def test_invalid_invite_path(self):
+        assert not serve.valid_invite_path("/invite/")
+        assert not serve.valid_invite_path("/invite/code/extra")
+        assert not serve.valid_invite_path("/invite/<script>")
 
 
 # ---------------------------------------------------------------------------
@@ -375,7 +393,7 @@ class TestHTTPEndpoints(unittest.TestCase):
                 os.remove(fp)
 
     def _conn(self):
-        return http.client.HTTPConnection("127.0.0.1", self.port)
+        return _ClosingHTTPConnection("127.0.0.1", self.port)
 
     def _register_via_http(self, uid=TEST_UID):
         conn = self._conn()
@@ -854,6 +872,24 @@ class TestHTTPEndpoints(unittest.TestCase):
         body = resp.read()
         assert resp.status == 200
         assert resp.getheader("Content-Type") == "text/html"
+        conn.close()
+
+    def test_invite_page(self):
+        conn = self._conn()
+        conn.request("GET", "/invite/spring-2026_A")
+        resp = conn.getresponse()
+        body = resp.read()
+        assert resp.status == 200
+        assert resp.getheader("Content-Type") == "text/html"
+        assert b"invite_app.js" in body
+        conn.close()
+
+    def test_invalid_invite_page_404(self):
+        conn = self._conn()
+        conn.request("GET", "/invite/bad/path")
+        resp = conn.getresponse()
+        resp.read()
+        assert resp.status == 404
         conn.close()
 
     def test_static_js_served(self):

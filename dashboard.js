@@ -76,6 +76,7 @@ async function loadTimeline(uid) {
       if (type === "seed_click" && evt.text) detail = evt.text;
       if (type === "start_learning" && evt.questions) text = evt.questions;
       if (type === "feedback" && evt.text) text = evt.text;
+      if (type === "invite" && evt.code) detail = `invite ${evt.code}`;
 
       if (type === "assessment_start") detail = `${evt.assessment} | ${evt.group || "?"} | form ${evt.form || "?"}`;
       if (type === "assessment_answer") {

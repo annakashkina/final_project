@@ -1,0 +1,434 @@
+{
+  "assessment": {
+    "answers": 71,
+    "any_completion_rate_from_all_starts_pct": 64.3,
+    "completions": 9,
+    "current_completion_rate_from_all_starts_pct": 57.1,
+    "current_valid_pre_completions": 8,
+    "eligible_for_post_by_last_event": 4,
+    "group_form_current_completion_counts": {
+      "control|A": 2,
+      "treatment|B": 6
+    },
+    "group_form_start_counts": {
+      "control|A": 6,
+      "treatment|B": 8
+    },
+    "legacy_or_partial_completions": 1,
+    "partial_dropout": 1,
+    "post_completions": 0,
+    "post_starts": 0,
+    "pre_starts": 14,
+    "started_no_answer": 4,
+    "starts": 14
+  },
+  "concept_scores_current_valid_pre": [
+    {
+      "concept": "Logic: modular arithmetic and state",
+      "mean_score_0_to_3": 0.83,
+      "n": 6,
+      "pct_of_max": 27.8,
+      "score_0": 3,
+      "score_1": 1,
+      "score_2": 2,
+      "score_3": 0
+    },
+    {
+      "concept": "write() and file descriptors",
+      "mean_score_0_to_3": 1,
+      "n": 8,
+      "pct_of_max": 33.3,
+      "score_0": 3,
+      "score_1": 3,
+      "score_2": 1,
+      "score_3": 1
+    },
+    {
+      "concept": "Character checks and ASCII math",
+      "mean_score_0_to_3": 1.12,
+      "n": 8,
+      "pct_of_max": 37.5,
+      "score_0": 3,
+      "score_1": 2,
+      "score_2": 2,
+      "score_3": 1
+    },
+    {
+      "concept": "Recursion",
+      "mean_score_0_to_3": 1.25,
+      "n": 8,
+      "pct_of_max": 41.7,
+      "score_0": 3,
+      "score_1": 2,
+      "score_2": 1,
+      "score_3": 2
+    },
+    {
+      "concept": "Linked list traversal",
+      "mean_score_0_to_3": 1.62,
+      "n": 8,
+      "pct_of_max": 54.2,
+      "score_0": 2,
+      "score_1": 1,
+      "score_2": 3,
+      "score_3": 2
+    },
+    {
+      "concept": "Static variables and persistent state",
+      "mean_score_0_to_3": 1.62,
+      "n": 8,
+      "pct_of_max": 54.2,
+      "score_0": 2,
+      "score_1": 2,
+      "score_2": 1,
+      "score_3": 3
+    },
+    {
+      "concept": "argc/argv and argument handling",
+      "mean_score_0_to_3": 1.62,
+      "n": 8,
+      "pct_of_max": 54.2,
+      "score_0": 1,
+      "score_1": 3,
+      "score_2": 2,
+      "score_3": 2
+    },
+    {
+      "concept": "Strings and the \\0 loop",
+      "mean_score_0_to_3": 2.12,
+      "n": 8,
+      "pct_of_max": 70.8,
+      "score_0": 0,
+      "score_1": 2,
+      "score_2": 3,
+      "score_3": 3
+    },
+    {
+      "concept": "Logic: swap and in-place modification",
+      "mean_score_0_to_3": 3,
+      "n": 2,
+      "pct_of_max": 100.0,
+      "score_0": 0,
+      "score_1": 0,
+      "score_2": 0,
+      "score_3": 2
+    }
+  ],
+  "event_type_counts": {
+    "None": 2,
+    "assessment_answer": 71,
+    "assessment_complete": 9,
+    "assessment_start": 14,
+    "back_home": 254,
+    "feedback": 10,
+    "i_know_toggle": 71,
+    "lang_toggle": 4,
+    "lesson_complete": 80,
+    "lesson_open": 529,
+    "mode_toggle": 27,
+    "page_load": 437,
+    "phase_change": 733,
+    "seed_click": 118,
+    "start_learning": 128,
+    "tutor_reply": 302,
+    "tutor_retry": 117,
+    "user_msg": 175
+  },
+  "followup_after_valid_pre": {
+    "post_starts_after_pre": 0,
+    "treatment_completed_any_lesson": 0,
+    "treatment_completed_recommended": 0,
+    "treatment_opened_any_lesson": 2,
+    "treatment_opened_recommended": 1,
+    "treatment_pre_completers": 6,
+    "treatment_started_any_lesson": 1,
+    "treatment_started_recommended": 0
+  },
+  "generated_at": "2026-05-19T07:12:46+00:00",
+  "lesson_engagement": {
+    "duplicate_estimates": [
+      {
+        "event_type": "lesson_open",
+        "near_duplicate_within_100ms": 161,
+        "pct": 30.4,
+        "total": 529
+      },
+      {
+        "event_type": "phase_change",
+        "near_duplicate_within_100ms": 160,
+        "pct": 21.8,
+        "total": 733
+      }
+    ],
+    "lesson_complete_events": 80,
+    "lesson_event_count": 2421,
+    "lesson_event_users": 28,
+    "start_learning_events": 128,
+    "top3_users_completion_count": 73,
+    "top3_users_event_count": 2096,
+    "top3_users_event_pct": 86.6,
+    "top_completed_lessons": [
+      [
+        "c-pointers",
+        25
+      ],
+      [
+        "rust-slices",
+        4
+      ],
+      [
+        "enums-matching",
+        3
+      ],
+      [
+        "rust-concurrency",
+        3
+      ],
+      [
+        "rust-structs",
+        3
+      ],
+      [
+        "meta-flow",
+        3
+      ],
+      [
+        "traits-generics",
+        2
+      ],
+      [
+        "lifetimes",
+        2
+      ],
+      [
+        "rust-borrowing",
+        2
+      ],
+      [
+        "rust-enums",
+        2
+      ]
+    ],
+    "top_opened_lessons": [
+      [
+        "c-pointers",
+        77
+      ],
+      [
+        "meta-what",
+        35
+      ],
+      [
+        "c-loops",
+        23
+      ],
+      [
+        "meta-stack",
+        23
+      ],
+      [
+        "py-lists-comprehensions",
+        21
+      ],
+      [
+        "rust-slices",
+        19
+      ],
+      [
+        "meta-flow",
+        17
+      ],
+      [
+        "rust-concurrency",
+        17
+      ],
+      [
+        "meta-lessons",
+        15
+      ],
+      [
+        "enums-matching",
+        14
+      ]
+    ],
+    "top_started_lessons": [
+      [
+        "c-pointers",
+        38
+      ],
+      [
+        "rust-concurrency",
+        9
+      ],
+      [
+        "rust-slices",
+        9
+      ],
+      [
+        "enums-matching",
+        6
+      ],
+      [
+        "py-lists-comprehensions",
+        6
+      ],
+      [
+        "c-switch",
+        5
+      ],
+      [
+        "traits-generics",
+        3
+      ],
+      [
+        "rust-structs",
+        3
+      ],
+      [
+        "meta-flow",
+        3
+      ],
+      [
+        "ml-features",
+        3
+      ]
+    ],
+    "unique_lesson_complete_users": 8,
+    "unique_start_learning_users": 14,
+    "without_top3_lesson_complete_events": 7,
+    "without_top3_start_learning_events": 18,
+    "without_top3_users": 25
+  },
+  "llm_and_grading": {
+    "assessment_answers_with_immediate_retry": 37,
+    "assessment_answers_with_immediate_retry_pct": 52.1,
+    "chat_failed_preretry_records": 117,
+    "chat_models": {
+      "active-model": 3,
+      "moonshotai/kimi-k2-instruct": 121,
+      "openai/gpt-oss-120b": 315
+    },
+    "chat_records": 439,
+    "grading_chat_records": 107,
+    "parseable_retry_score_pairs": 36,
+    "retry_score_changed_count": 4,
+    "retry_score_changed_pct": 11.1,
+    "tutor_retry_events": 117,
+    "tutor_retry_reasons": {
+      "error": 15,
+      "too_short": 102
+    }
+  },
+  "metadata_quality": {
+    "assessment_starters_with_ua_or_country": 1,
+    "country_counts_top10": [
+      [
+        "US",
+        45
+      ],
+      [
+        "unknown",
+        20
+      ],
+      [
+        "NL",
+        8
+      ],
+      [
+        "IE",
+        6
+      ],
+      [
+        "LT",
+        4
+      ],
+      [
+        "DE",
+        4
+      ],
+      [
+        "SA",
+        4
+      ],
+      [
+        "GB",
+        3
+      ],
+      [
+        "TR",
+        3
+      ],
+      [
+        "IT",
+        3
+      ]
+    ],
+    "malformed_or_missing_type_events": 2,
+    "users_with_country": 104,
+    "users_with_ua": 106
+  },
+  "scores_current_valid_pre": {
+    "answer_score_distribution": {
+      "0": 17,
+      "1": 16,
+      "2": 15,
+      "3": 16
+    },
+    "answer_score_distribution_pct": {
+      "0": 26.6,
+      "1": 25.0,
+      "2": 23.4,
+      "3": 25.0
+    },
+    "max_score": 23,
+    "mean_pct": 49.25,
+    "mean_score": 11.75,
+    "median_pct": 42.0,
+    "median_score": 10.0,
+    "min_score": 4,
+    "n": 8,
+    "word_count_by_score": {
+      "0": {
+        "max_words": 26,
+        "mean_words": 10.6,
+        "median_words": 8,
+        "min_words": 2,
+        "n": 17
+      },
+      "1": {
+        "max_words": 34,
+        "mean_words": 17.4,
+        "median_words": 20.0,
+        "min_words": 1,
+        "n": 16
+      },
+      "2": {
+        "max_words": 137,
+        "mean_words": 44.6,
+        "median_words": 34,
+        "min_words": 14,
+        "n": 15
+      },
+      "3": {
+        "max_words": 136,
+        "mean_words": 58.2,
+        "median_words": 56.5,
+        "min_words": 19,
+        "n": 16
+      }
+    },
+    "word_count_score_pearson_r": 0.644
+  },
+  "source_data_dir": "/Users/ann/backup/data/data",
+  "summary": {
+    "chat_files": 22,
+    "event_count": 3081,
+    "event_date_end": "2026-05-18T17:26:28+00:00",
+    "event_date_start": "2026-02-11T20:02:26+00:00",
+    "feedback_records": 5,
+    "registered_users": 124,
+    "user_event_files": 121,
+    "user_first_seen_end": "2026-05-18T16:56:17+00:00",
+    "user_first_seen_start": "2026-02-11T20:02:26+00:00"
+  }
+}

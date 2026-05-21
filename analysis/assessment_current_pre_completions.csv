@@ -1,0 +1,9 @@
+participant,uid_prefix,group,form,score,max_score,pct,duration_min,answers_in_completion_payload,unique_questions,recommended_lesson,recommended_title,eligible_for_post_by_last_event,post_started
+C01,7ef6c61c,control,A,23,24,96,28.8,8,8,s01-write,write() & File Descriptors,True,False
+C02,13db08a9,treatment,B,10,24,42,24.5,8,8,s01-control-flow,Control Flow & Loops,True,False
+C03,5eab9c79,control,A,11,24,46,121.0,9,8,s01-write,write() & File Descriptors,True,False
+C04,77e953fd,treatment,B,10,24,42,19.6,8,8,s01-write,write() & File Descriptors,True,False
+C05,66ad8407,treatment,B,9,24,38,13.4,8,8,s01-ascii,ASCII & Character Math,False,False
+C06,c90363fc,treatment,B,6,24,25,21.6,8,8,s01-strings,Strings & Null Termination,False,False
+C07,4fc38ff5,treatment,B,21,24,88,38.2,8,8,s01a2-linked-list,Linked Lists,False,False
+C08,6c5d2a32,treatment,B,4,24,17,30.2,8,8,s01-strings,Strings & Null Termination,False,False

@@ -1,0 +1,15 @@
+participant,uid_prefix,status,group,form,start_ts,answer_events,completion_score,completion_pct,duration_min
+P01,1072bc68,started_no_answer,treatment,B,2026-05-14T14:32:38+00:00,0,,,
+P02,13db08a9,completed_current_pre,treatment,B,2026-05-13T20:03:22+00:00,8,10,42,24.5
+P03,17d97036,started_no_answer,control,A,2026-05-18T11:57:10+00:00,0,,,
+P04,4fc38ff5,completed_current_pre,treatment,B,2026-05-18T15:45:36+00:00,8,21,88,38.2
+P05,5eab9c79,completed_current_pre,control,A,2026-05-14T07:24:38+00:00,8,11,46,121.0
+P06,66ad8407,completed_current_pre,treatment,B,2026-05-18T07:36:12+00:00,8,9,38,13.4
+P07,6c5d2a32,completed_current_pre,treatment,B,2026-05-18T16:56:17+00:00,8,4,17,30.2
+P08,77e953fd,completed_current_pre,treatment,B,2026-05-14T11:21:51+00:00,8,10,42,19.6
+P09,7ef6c61c,completed_current_pre,control,A,2026-05-13T14:28:38+00:00,8,23,96,28.8
+P10,81afacdc,started_no_answer,control,A,2026-05-18T08:48:26+00:00,0,,,
+P11,88adb411,started_no_answer,control,A,2026-05-16T16:54:55+00:00,0,,,
+P12,8d62d98e,legacy_or_partial_completion,treatment,B,2026-05-13T08:40:55+00:00,5,0,0,0.5
+P13,c90363fc,completed_current_pre,treatment,B,2026-05-18T11:07:24+00:00,8,6,25,21.6
+P14,ebc933c6,partial_dropout,control,A,2026-05-18T08:29:45+00:00,2,,,
