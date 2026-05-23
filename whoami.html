@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>codeprobe &mdash; whoami</title>
+  <link rel="icon" href="data:,">
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      max-width: 640px;
+      margin: 40px auto;
+      padding: 0 20px;
+      line-height: 1.5;
+      color: #2a2a2a;
+      font-size: 15px;
+    }
+    h1 { font-size: 20px; margin-bottom: 4px; }
+    .subtitle { color: #777; font-size: 13px; margin-bottom: 24px; }
+    .field { margin-bottom: 20px; }
+    label { display: block; font-weight: 600; margin-bottom: 6px; font-size: 13px; color: #555; }
+    .row { display: flex; gap: 8px; align-items: stretch; }
+    input[type="text"] {
+      flex: 1;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 13px;
+      padding: 8px 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background: #f7f7f7;
+      color: #2a2a2a;
+    }
+    button {
+      font-family: inherit;
+      font-size: 13px;
+      padding: 8px 14px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background: #fff;
+      cursor: pointer;
+    }
+    button:hover { background: #f0f0f0; }
+    button.copied { background: #d8f5d8; border-color: #6ab06a; }
+    .pair {
+      margin-top: 8px;
+      padding: 10px;
+      background: #fafafa;
+      border: 1px solid #eee;
+      border-radius: 4px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px;
+      word-break: break-all;
+    }
+    .missing { color: #b04040; font-size: 13px; }
+    .note { color: #777; font-size: 12px; margin-top: 24px; }
+  </style>
+</head>
+<body>
+  <h1>whoami</h1>
+  <div class="subtitle">Your local identifiers &mdash; share with support to diagnose issues</div>
+
+  <div class="field">
+    <label for="uid">UID</label>
+    <div class="row">
+      <input type="text" id="uid" readonly>
+      <button id="copy-uid" data-target="uid">Copy</button>
+    </div>
+  </div>
+
+  <div class="field">
+    <label for="token">Token</label>
+    <div class="row">
+      <input type="text" id="token" readonly>
+      <button id="copy-token" data-target="token">Copy</button>
+    </div>
+  </div>
+
+  <div class="field">
+    <label for="pair">UID + Token (combined)</label>
+    <div class="row">
+      <input type="text" id="pair" readonly>
+      <button id="copy-pair" data-target="pair">Copy</button>
+    </div>
+  </div>
+
+  <div id="missing" class="missing" style="display:none"></div>
+
+  <p class="note">Values are read from this browser's local storage. They are not transmitted by this page.</p>
+
+  <script src="/whoami.js"></script>
+</body>
+</html>

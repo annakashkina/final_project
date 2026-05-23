@@ -66,7 +66,6 @@ function enableSavingForInvite() {
   const uid = getUID();
   localStorage.setItem("codeprobe_uid", uid);
   localStorage.setItem("codeprobe_privacy", "saving");
-  localStorage.setItem("codeprobe_prompt_lab", "1");
 }
 
 async function trackInvite(code) {
@@ -109,7 +108,7 @@ if (!code) {
       enableSavingForInvite();
       await trackInvite(code);
       status.innerHTML = `Recorded <span class="invite-code">invite ${escHTML(code)}</span>. Redirecting...`;
-      window.location.assign("/c-fundamentals?promptlab=1");
+      window.location.assign("/c-fundamentals");
     } catch {
       check.disabled = false;
       start.disabled = !check.checked;

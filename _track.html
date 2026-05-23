@@ -32,56 +32,6 @@
     </div>
   </div>
 
-  <div id="prompt-lab-modal" class="prompt-lab-modal hidden">
-    <div class="prompt-lab-card">
-      <div class="prompt-lab-head">
-        <div class="prompt-lab-title">Prompt Lab</div>
-        <button id="prompt-lab-close" class="prompt-lab-close" aria-label="close">&times;</button>
-      </div>
-
-      <div class="prompt-lab-tabs" role="tablist">
-        <button class="prompt-lab-tab active" data-mode="quick" role="tab">quick</button>
-        <button class="prompt-lab-tab" data-mode="full" role="tab">deep</button>
-      </div>
-      <select id="prompt-lab-mode" class="hidden">
-        <option value="quick">quick</option>
-        <option value="full">full</option>
-      </select>
-
-      <div class="prompt-lab-body">
-        <textarea id="prompt-lab-template" class="prompt-lab-template" rows="14" spellcheck="false"></textarea>
-        <pre id="prompt-lab-preview" class="prompt-lab-preview hidden"></pre>
-      </div>
-
-      <div id="prompt-lab-chips-section" class="prompt-lab-chips-section">
-        <div class="prompt-lab-chips-label">click to insert</div>
-        <div id="prompt-lab-chips" class="prompt-lab-chips">
-          <button type="button" data-ph="code">{{code}}</button>
-          <button type="button" data-ph="lessonTitle">{{lessonTitle}}</button>
-          <button type="button" data-ph="lessonSeries">{{lessonSeries}}</button>
-          <button type="button" data-ph="mode">{{mode}}</button>
-          <button type="button" data-ph="concepts">{{concepts}}</button>
-          <button type="button" data-ph="languageInstruction">{{languageInstruction}}</button>
-          <button type="button" data-ph="bridgesBlock">{{bridgesBlock}}</button>
-          <button type="button" data-ph="studentDesc">{{studentDesc}}</button>
-          <button type="button" data-ph="studentQuestions">{{studentQuestions}}</button>
-          <button type="button" data-ph="studentQuestionsBlock">{{studentQuestionsBlock}}</button>
-          <button type="button" data-ph="knownLanguages">{{knownLanguages}}</button>
-          <button type="button" data-ph="knownConcepts">{{knownConcepts}}</button>
-        </div>
-      </div>
-
-      <div class="prompt-lab-footer">
-        <span id="prompt-lab-status" class="prompt-lab-status"></span>
-        <div class="prompt-lab-buttons">
-          <button id="prompt-lab-preview-btn" class="btn-secondary">preview</button>
-          <button id="prompt-lab-reset-btn" class="btn-secondary">reset</button>
-          <button id="prompt-lab-save-btn" class="btn-primary">save</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <header id="header">
     <div class="header-left">
       <button id="back-btn" class="back-btn hidden">&larr;</button>
@@ -171,14 +121,13 @@
                 <button class="mode-opt active" data-mode="quick">quick</button>
                 <button class="mode-opt" data-mode="full">deep</button>
               </div>
-              <button id="prompt-lab-btn" class="text-btn prompt-lab-btn hidden">prompt</button>
             </div>
           </div>
           <div class="explore-optional">
             <div class="explore-optional-toggle" id="explore-optional-toggle">
-              or guide the tutor with your own questions <span class="seed-arrow">&#9662;</span>
+              or guide the tutor with your own questions <span class="seed-arrow">&#9652;</span>
             </div>
-            <div id="explore-optional-body" class="explore-optional-body hidden">
+            <div id="explore-optional-body" class="explore-optional-body">
               <textarea id="user-questions"
                         placeholder="Your questions about this code..."
                         rows="3"></textarea>
@@ -211,6 +160,6 @@
   </main>
 
   <div id="toast" class="toast hidden"></div>
-  <script type="module" src="app.js?v=13"></script>
+  <script type="module" src="app.js?v=15"></script>
 </body>
 </html>

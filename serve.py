@@ -549,6 +549,16 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(content)
 
+        elif self.path == "/whoami":
+            who_path = os.path.join(BASE_DIR, "whoami.html")
+            with open(who_path, "rb") as f:
+                content = f.read()
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html")
+            self.send_header("Content-Length", str(len(content)))
+            self.end_headers()
+            self.wfile.write(content)
+
         elif self.path.split("?")[0] in _PAGES:
             self._serve_page_route()
 

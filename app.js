@@ -245,79 +245,11 @@ function renderChips() {
   });
 }
 
-// System prompt + hidden Prompt Lab
-const PROMPT_LAB_FLAG_KEY = "codeprobe_prompt_lab";
-const PROMPT_TEMPLATE_KEY_PREFIX = "codeprobe_prompt_template_v1_";
-const PROMPT_TEMPLATE_MAX = 8000;
-const QUICK_APPROACH_DEFAULT = `Your job is to QUIZ and teach the student, not overwhelm them. Address their question briefly (1-2 sentences, but if you see clear curiosity - no limits), then immediately ask ONE quiz question about the code. The student learns by attempting the question, not by reading an explanation. However, **this does not apply to your first reply, do not quiz first**. Start by engaging and asking the student a question in order to spark their curiosity and gauge their knowledge/background (NOT their interests/curiosities), and then adapt to it; be specific. Then continue with the quizzes, ADAPTING to their level. Handing agency to the learner, supporting growth mindset, normalizing unfamiliarity and activating prior knowledge is important. Only quiz/teach after they respond.
-
-After they answer:
-- If correct AND it shows understanding of the lesson: brief feedback, 1-sentence summary, end with [LESSON_COMPLETE].
-- **VERY IMPORTANT**: If there is no evidence of attempted solution or lack of understanding is evident: stop quizzing and explaining, instead, ask them and try to understand what they do know, then downgrade the interactions to their level.
-- If wrong (first attempt): If possible, give only a brief, encouraging hint that steers them closer to the right answer. No new quizzes or explanations.
-- If wrong (second or more attempt): Reveal the correct answer with a brief elaboration of WHY it is correct, ask a NEW question. Do NOT end with [LESSON_COMPLETE] until they answer a question correctly.
-CRITICAL: Never use [LESSON_COMPLETE] in the same response where you corrected the student. Do NOT end with [LESSON_COMPLETE] until they answer a question correctly.
-
-RULES: Be conversational. ONE question only. Use backtick code snippets. Reference specific lines. ~1-3 total exchanges. Only reference languages the student knows — do NOT assume knowledge of languages not listed.`;
-
-const FULL_APPROACH_DEFAULT = `Your job is to QUIZ and teach the student, not overwhelm them. Address their question briefly (but if you see clear curiosity - no limits), then immediately ask ONE quiz question about the code. The student learns by attempting the question, not by reading an explanation. However, **this does not apply to your first reply, do not quiz first**. Start by engaging and asking the student a question in order to spark their curiosity and gauge their knowledge/background (NOT their interests/curiosities), and then adapt to it; be specific. Then continue with the quizzes, ADAPTING to their level. Handing agency to the learner, supporting growth mindset, normalizing unfamiliarity and activating prior knowledge is important. Only quiz/teach after they respond.
-
-After they answer:
-- If correct AND it's been 4-5 exchanges: brief feedback, summarize what they learned in 2-3 sentences, end with [LESSON_COMPLETE].
-- If correct but early: brief feedback, teach the next concept in 1-2 sentences, ask a NEW quiz question.
-- **VERY IMPORTANT**: If there is no evidence of attempted solution or lack of understanding is evident: stop quizzing and explaining, instead, ask them and try to understand what they do know, then downgrade the interactions to their level.
-- If wrong (first attempt): If possible, give only a brief, encouraging hint that steers them closer to the right answer. No new quizzes or explanations.
-- If wrong (second or more attempt): Reveal the correct answer with some elaboration of WHY it is correct, ask a NEW question. Do NOT end with [LESSON_COMPLETE] until they answer a question correctly.
-CRITICAL: Never use [LESSON_COMPLETE] in the same response where you corrected the student. Do NOT end with [LESSON_COMPLETE] until they answer a question correctly.
-
-RULES: Be conversational. ONE question at a time. Use backtick code snippets. Reference specific lines. ~5-7 total exchanges. Only reference languages the student knows — do NOT assume knowledge of languages not listed.`;
-
-function defaultEditorTemplate(mode) {
-  const approach = promptMode(mode) === "quick" ? QUICK_APPROACH_DEFAULT : FULL_APPROACH_DEFAULT;
-  return `You are a tutor teaching {{studentDesc}}. They are learning {{lessonSeries}} through real code.
-{{languageInstruction}}
-${approach}
-
-{{bridgesBlock}}CODE:
-\`\`\`
-{{code}}
-\`\`\`
-
-CONCEPTS: {{concepts}}
-
-{{studentQuestionsBlock}}`;
-}
-
+// System prompt
 const PROMPT_MODES = ["quick", "full"];
-
-const promptLabParam = new URLSearchParams(window.location.search).get("promptlab");
-if (promptLabParam === "1") localStorage.setItem(PROMPT_LAB_FLAG_KEY, "1");
-if (promptLabParam === "0") localStorage.removeItem(PROMPT_LAB_FLAG_KEY);
-
-function promptLabEnabled() {
-  return localStorage.getItem(PROMPT_LAB_FLAG_KEY) === "1";
-}
 
 function promptMode(mode) {
   return PROMPT_MODES.includes(mode) ? mode : "quick";
-}
-
-function promptTemplateKey(mode) {
-  return PROMPT_TEMPLATE_KEY_PREFIX + promptMode(mode);
-}
-
-function getPromptLabTemplate(mode = state.mode) {
-  const raw = localStorage.getItem(promptTemplateKey(mode)) || "";
-  if (!raw.trim() || raw.length > PROMPT_TEMPLATE_MAX) return null;
-  return raw;
-}
-
-function renderPromptTemplate(template, values) {
-  let out = template;
-  for (const [key, value] of Object.entries(values)) {
-    out = out.split(`{{${key}}}`).join(value ?? "");
-  }
-  return out;
 }
 
 function buildPromptContext(lesson, questions, mode = state.mode) {
@@ -366,17 +298,17 @@ function buildPromptContext(lesson, questions, mode = state.mode) {
   const isQuick = mode === "quick";
 
   const approach = isQuick
-    ? `Your job is to QUIZ and teach the student, not overwhelm them. Address their question briefly (1-2 sentences, but if you see clear curiosity - no limits)${bridgeNote}, then immediately ask ONE quiz question about the code. The student learns by attempting the question, not by reading an explanation. ${questions ? "Handing agency to the learner, supporting growth mindset, normalizing unfamiliarity and activating prior knowledge is important." : "However, **this does not apply to your first reply, do not quiz first**. Start by engaging and asking the student a question in order to spark their curiosity and gauge their knowledge/background (NOT their interests/curiosities), and then adapt to it; be specific. Then continue with the quizzes, ADAPTING to their level. Handing agency to the learner, supporting growth mindset, normalizing unfamiliarity and activating prior knowledge is important. Only quiz/teach after they respond."}
+    ? `Your job is to QUIZ and teach the student through the code, not overwhelm them. Address their question briefly (1-2 sentences, but if you see clear curiosity - no limits)${bridgeNote}, then ask ONE quiz question about the code. The student learns by attempting the question, not by reading an explanation. ${questions ? "Address their pre-written questions in your first reply, then transition to ONE small quiz question. Be neutral and direct — no welcome, no exclamation marks, no emoji, no 'great question'." : "**Your FIRST reply opens the lesson. Follow this rule strictly:**\n- Do NOT ask the student about their background, experience, or what they already know.\n- Do NOT welcome them, introduce yourself, or use exclamation marks or emoji.\n- Point at ONE specific line or expression in the code (e.g. \"Line 12: `if (score = 0)`\") and state ONE concrete observation about it in a single short sentence.\n- Then ask ONE tiny, low-stakes question about that specific thing — prefer \"what will this print?\", \"is this true or false?\", a fill-in-the-blank, or a binary choice. Avoid open-ended questions like \"what stands out?\" or \"what do you think?\".\n- Keep the whole first reply under ~4 short lines.\n\nOn all later turns, ADAPT to the student's level. If the student gives a one-word or \"idk\" answer, shrink the next ask further — point at a smaller piece, give them a binary choice. Handing agency to the learner, supporting growth mindset, normalizing unfamiliarity and activating prior knowledge is important."}
 
 After they answer:
-- If correct AND it shows understanding of the lesson: brief feedback, 1-sentence summary, end with [LESSON_COMPLETE].
+- If correct AND it shows understanding of the lesson: confirm briefly, then explain the MECHANISM in ONE short sentence (the underlying rule/reason, not just confirmation — e.g. "because the condition \`i < 5\` is false when i equals 5, the body skips that iteration", or "because \`do-while\` checks its condition AFTER running the body, the body runs at least once even if the condition starts false"). Then add a 1-sentence summary of what they learned, and end with [LESSON_COMPLETE].
 - **VERY IMPORTANT**: If there is no evidence of attempted solution or lack of understanding is evident: stop quizzing and explaining, instead, ask them and try to understand what they do know, then downgrade the interactions to their level.
 - If wrong (first attempt): If possible, give only a brief, encouraging hint that steers them closer to the right answer. No new quizzes or explanations.
 - If wrong (second or more attempt): Reveal the correct answer with a brief elaboration of WHY it is correct, ask a NEW question. Do NOT end with [LESSON_COMPLETE] until they answer a question correctly.
 CRITICAL: Never use [LESSON_COMPLETE] in the same response where you corrected the student. Do NOT end with [LESSON_COMPLETE] until they answer a question correctly.
 
-RULES: Be conversational. ONE question only. Use backtick code snippets. Reference specific lines. ~1-3 total exchanges. Only reference languages the student knows — do NOT assume knowledge of languages not listed.${levelNote}`
-    : `Your job is to QUIZ and teach the student, not overwhelm them. Address their question briefly (but if you see clear curiosity - no limits)${bridgeNote}, then immediately ask ONE quiz question about the code. The student learns by attempting the question, not by reading an explanation. ${questions ? "Handing agency to the learner, supporting growth mindset, normalizing unfamiliarity and activating prior knowledge is important." : "However, **this does not apply to your first reply, do not quiz first**. Start by engaging and asking the student a question in order to spark their curiosity and gauge their knowledge/background (NOT their interests/curiosities), and then adapt to it; be specific. Then continue with the quizzes, ADAPTING to their level. Handing agency to the learner, supporting growth mindset, normalizing unfamiliarity and activating prior knowledge is important. Only quiz/teach after they respond."}
+RULES: Be conversational but NEUTRAL — no "great question", no "welcome", no exclamation marks, no emoji. ONE question only. Use backtick code snippets. Reference specific lines. ~1-3 total exchanges. Only reference languages the student knows — do NOT assume knowledge of languages not listed.${levelNote}`
+    : `Your job is to QUIZ and teach the student through the code, not overwhelm them. Address their question briefly (but if you see clear curiosity - no limits)${bridgeNote}, then ask ONE quiz question about the code. The student learns by attempting the question, not by reading an explanation. ${questions ? "Address their pre-written questions in your first reply, then transition to ONE small quiz question. Be neutral and direct — no welcome, no exclamation marks, no emoji, no 'great question'." : "**Your FIRST reply opens the lesson. Follow this rule strictly:**\n- Do NOT ask the student about their background, experience, or what they already know.\n- Do NOT welcome them, introduce yourself, or use exclamation marks or emoji.\n- Point at ONE specific line or expression in the code (e.g. \"Line 12: `if (score = 0)`\") and state ONE concrete observation about it in a single short sentence.\n- Then ask ONE tiny, low-stakes question about that specific thing — prefer \"what will this print?\", \"is this true or false?\", a fill-in-the-blank, or a binary choice. Avoid open-ended questions like \"what stands out?\" or \"what do you think?\".\n- Keep the whole first reply under ~4 short lines.\n\nOn all later turns, ADAPT to the student's level. If the student gives a one-word or \"idk\" answer, shrink the next ask further — point at a smaller piece, give them a binary choice. Handing agency to the learner, supporting growth mindset, normalizing unfamiliarity and activating prior knowledge is important."}
 
 After they answer:
 - If correct AND it's been 4-5 exchanges: brief feedback, summarize what they learned in 2-3 sentences, end with [LESSON_COMPLETE].
@@ -386,7 +318,7 @@ After they answer:
 - If wrong (second or more attempt): Reveal the correct answer with some elaboration of WHY it is correct, ask a NEW question. Do NOT end with [LESSON_COMPLETE] until they answer a question correctly.
 CRITICAL: Never use [LESSON_COMPLETE] in the same response where you corrected the student. Do NOT end with [LESSON_COMPLETE] until they answer a question correctly.
 
-RULES: Be conversational. ONE question at a time. Use backtick code snippets. Reference specific lines. ~5-7 total exchanges. Only reference languages the student knows — do NOT assume knowledge of languages not listed.${levelNote}`;
+RULES: Be conversational but NEUTRAL — no "great question", no "welcome", no exclamation marks, no emoji. ONE question at a time. Use backtick code snippets. Reference specific lines. ~5-7 total exchanges. Only reference languages the student knows — do NOT assume knowledge of languages not listed.${levelNote}`;
 
   const langInstruction = state.lang !== "en"
     ? `\nLANGUAGE: Respond entirely in ${LANG_NAMES[state.lang] || state.lang}. All explanations, questions, feedback, and quizzes must be in ${LANG_NAMES[state.lang] || state.lang}. Use English only for code snippets and technical terms that have no standard translation.\n`
@@ -423,28 +355,8 @@ CONCEPTS: ${ctx.conceptsText}
 ${ctx.studentQuestionsBlock}`;
 }
 
-function promptTemplateValues(ctx) {
-  return {
-    studentDesc: ctx.studentDesc,
-    lessonTitle: ctx.lesson.title || "",
-    lessonSeries: ctx.lesson.series || "",
-    mode: ctx.mode,
-    languageInstruction: ctx.langInstruction,
-    bridgesBlock: ctx.bridgesBlock,
-    code: ctx.code,
-    concepts: ctx.conceptsText,
-    studentQuestions: ctx.questions || "",
-    studentQuestionsBlock: ctx.studentQuestionsBlock,
-    knownLanguages: ctx.known.join(", "),
-    knownConcepts: ctx.knownConcepts.join(", "),
-  };
-}
-
 function buildPrompt(lesson, questions) {
-  const ctx = buildPromptContext(lesson, questions);
-  const customTemplate = promptLabEnabled() ? getPromptLabTemplate(ctx.mode) : null;
-  if (!customTemplate) return defaultPromptFromContext(ctx);
-  return renderPromptTemplate(customTemplate, promptTemplateValues(ctx));
+  return defaultPromptFromContext(buildPromptContext(lesson, questions));
 }
 
 // Demo response always working for c-pointers: lesson with "What does &x give you?"
@@ -862,151 +774,6 @@ function toast(msg) {
   setTimeout(() => el.classList.add("hidden"), 2200);
 }
 
-// Hidden Prompt Lab. Access once with ?promptlab=1; disable with ?promptlab=0.
-const PromptLab = {
-  view: "edit",
-  status(msg, tone = "") {
-    const el = $("#prompt-lab-status");
-    el.textContent = msg;
-    el.style.color = tone === "error" ? "var(--red)" : tone === "warn" ? "var(--orange)" : "var(--dim)";
-  },
-  editMode() {
-    return promptMode($("#prompt-lab-mode")?.value || state.mode);
-  },
-  modeLabel(mode) { return mode === "quick" ? "quick" : "deep"; },
-  setMode(mode) {
-    mode = promptMode(mode);
-    $("#prompt-lab-mode").value = mode;
-    $$(".prompt-lab-tab").forEach(t => t.classList.toggle("active", t.dataset.mode === mode));
-    const saved = getPromptLabTemplate(mode);
-    $("#prompt-lab-template").value = saved || defaultEditorTemplate(mode);
-    this.setView("edit");
-    this.status(saved ? `custom ${this.modeLabel(mode)} prompt active` : `default ${this.modeLabel(mode)} prompt`);
-  },
-  setView(view) {
-    this.view = view;
-    const isPreview = view === "preview";
-    $("#prompt-lab-template").classList.toggle("hidden", isPreview);
-    $("#prompt-lab-preview").classList.toggle("hidden", !isPreview);
-    $("#prompt-lab-chips-section").classList.toggle("hidden", isPreview);
-    $("#prompt-lab-preview-btn").textContent = isPreview ? "back to edit" : "preview";
-  },
-  open() {
-    this.setMode(state.mode);
-    $("#prompt-lab-modal").classList.remove("hidden");
-    $("#prompt-lab-template").focus();
-  },
-  close() {
-    $("#prompt-lab-modal").classList.add("hidden");
-  },
-  togglePreview() {
-    if (this.view === "preview") {
-      this.setView("edit");
-      const mode = this.editMode();
-      this.status(getPromptLabTemplate(mode) ? `custom ${this.modeLabel(mode)} prompt active` : `default ${this.modeLabel(mode)} prompt`);
-      return;
-    }
-    const template = $("#prompt-lab-template").value;
-    if (template.length > PROMPT_TEMPLATE_MAX) {
-      this.status(`too long: ${template.length}/${PROMPT_TEMPLATE_MAX}`, "error");
-      return;
-    }
-    const mode = this.editMode();
-    const ctx = state.lesson
-      ? buildPromptContext(state.lesson, $("#user-questions")?.value.trim() || "", mode)
-      : samplePromptContext(mode);
-    $("#prompt-lab-preview").textContent = renderPromptTemplate(template, promptTemplateValues(ctx));
-    this.setView("preview");
-    const hasCode = template.includes("{{code}}");
-    const lessonNote = state.lesson ? "" : " (sample data — open a lesson for real values)";
-    this.status(hasCode ? `preview${lessonNote}` : `preview — warning: {{code}} missing${lessonNote}`, hasCode ? "" : "warn");
-  },
-  save() {
-    const mode = this.editMode();
-    const template = $("#prompt-lab-template").value;
-    if (template.length > PROMPT_TEMPLATE_MAX) {
-      this.status(`too long: ${template.length}/${PROMPT_TEMPLATE_MAX}`, "error");
-      return;
-    }
-    if (!template.trim()) {
-      localStorage.removeItem(promptTemplateKey(mode));
-      this.updateBtn();
-      this.status(`empty — default ${this.modeLabel(mode)} prompt restored`);
-      toast(`${this.modeLabel(mode)} prompt reset`);
-      return;
-    }
-    localStorage.setItem(promptTemplateKey(mode), template);
-    this.updateBtn();
-    const hasCode = template.includes("{{code}}");
-    this.status(hasCode ? `${this.modeLabel(mode)} prompt saved` : `saved — warning: {{code}} missing`, hasCode ? "" : "warn");
-    toast(`${this.modeLabel(mode)} prompt saved`);
-  },
-  reset() {
-    const mode = this.editMode();
-    localStorage.removeItem(promptTemplateKey(mode));
-    $("#prompt-lab-template").value = defaultEditorTemplate(mode);
-    this.setView("edit");
-    this.updateBtn();
-    this.status(`reset to default ${this.modeLabel(mode)} prompt`);
-  },
-  insert(name) {
-    const ta = $("#prompt-lab-template");
-    const token = `{{${name}}}`;
-    const s = ta.selectionStart ?? ta.value.length;
-    const e = ta.selectionEnd ?? ta.value.length;
-    ta.value = ta.value.slice(0, s) + token + ta.value.slice(e);
-    const caret = s + token.length;
-    ta.focus();
-    ta.setSelectionRange(caret, caret);
-  },
-  updateBtn() {
-    const btn = $("#prompt-lab-btn");
-    if (btn) btn.classList.toggle("active", !!getPromptLabTemplate(state.mode));
-  },
-};
-
-function samplePromptContext(mode) {
-  return {
-    lesson: { title: "(sample lesson)", series: "(sample series)", concepts: [] },
-    questions: "",
-    known: ["Python"],
-    knownConcepts: ["OOP"],
-    studentDesc: "a programmer who has worked with Python and has experience with OOP",
-    langInstruction: "",
-    bridgesBlock: "",
-    code: "// sample code\nint x = 42;\nint *p = &x;",
-    conceptsText: "(sample concepts)",
-    studentQuestionsBlock: "",
-    mode,
-  };
-}
-
-function initPromptLab() {
-  if (!promptLabEnabled()) return;
-  const btn = $("#prompt-lab-btn");
-  btn.classList.remove("hidden");
-  PromptLab.updateBtn();
-  btn.addEventListener("click", () => PromptLab.open());
-  $("#prompt-lab-close").addEventListener("click", () => PromptLab.close());
-  $("#prompt-lab-save-btn").addEventListener("click", () => PromptLab.save());
-  $("#prompt-lab-reset-btn").addEventListener("click", () => PromptLab.reset());
-  $("#prompt-lab-preview-btn").addEventListener("click", () => PromptLab.togglePreview());
-  $$(".prompt-lab-tab").forEach(t =>
-    t.addEventListener("click", () => PromptLab.setMode(t.dataset.mode))
-  );
-  $$("#prompt-lab-chips button").forEach(b =>
-    b.addEventListener("click", () => PromptLab.insert(b.dataset.ph))
-  );
-  $("#prompt-lab-modal").addEventListener("click", (e) => {
-    if (e.target.id === "prompt-lab-modal") PromptLab.close();
-  });
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && !$("#prompt-lab-modal").classList.contains("hidden")) PromptLab.close();
-  });
-}
-
-// Events
-initPromptLab();
 
 $("#back-btn").addEventListener("click", () => {
   track("back_home", { from_lesson: state.lesson?.id });
@@ -1018,7 +785,6 @@ $$("#mode-toggle .mode-opt").forEach(btn => {
     state.mode = btn.dataset.mode;
     localStorage.setItem("codeprobe_mode", state.mode);
     $$("#mode-toggle .mode-opt").forEach(b => b.classList.toggle("active", b === btn));
-    PromptLab.updateBtn();
     track("mode_toggle", { mode: state.mode });
   });
   // Restore active state from localStorage on load
