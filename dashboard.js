@@ -92,6 +92,20 @@ async function loadTimeline(uid) {
         }
       }
 
+      if (type === "daily_start") detail = `${evt.track || "?"} | ${evt.date || "?"}`;
+      if (type === "daily_answer") {
+        const s = evt.score !== null && evt.score !== undefined ? `${evt.score}/3` : "?";
+        detail = `${evt.level || "?"} — ${s} — ${evt.concept || ""}`;
+        if (evt.answer) text = evt.answer;
+      }
+      if (type === "daily_complete") {
+        detail = `${evt.track || "?"} | ${evt.date || "?"}: ${evt.score}/${evt.maxScore} (${evt.pct}%)`;
+        if (evt.durationMs) detail += ` in ${Math.round(evt.durationMs / 1000)}s`;
+        if (evt.answers) {
+          text = evt.answers.map(a => `${a.score ?? "?"}/3 [${a.level}] ${a.concept}`).join("\n");
+        }
+      }
+
       return `
         <div class="event ev-${type}">
           <div class="event-time" title="${absTime(evt.ts)}">${relTime(evt.ts)}</div>

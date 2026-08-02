@@ -25,14 +25,11 @@ from collections import Counter
 import numpy as np
 
 
-# ── Detection thresholds ────────────────────────────────────────────────
-# p_wrong(claim) >= DETECT_T              → claimed ref is flagged as wrong
-# p_wrong(cand)  < 0.5                    → candidate is on the "correct" side
-# p_wrong(claim) - p_wrong(cand) >= MARGIN → candidate is meaningfully better
-# No correction-window constant: `distance_from_claim` is now a feature, so
-# the model learns when distant candidates are plausible.
-DETECT_T = 0.5
-ACCEPT_MARGIN = 0.3
+# No tuning constants: the model is a listwise ranker that scores every
+# candidate line (including the LLM's claim) within one softmax. argmax wins.
+# `is_original_claim` lets the model learn the "claim is usually right" prior,
+# `distance_from_claim` lets it learn the distance prior — both are features,
+# neither is a hand-tuned threshold.
 
 
 # ── Regexes and lexicons ────────────────────────────────────────────────
@@ -136,6 +133,35 @@ def extract_refs(text):
     return refs
 
 
+# ── Adjacent fenced-block extraction ────────────────────────────────────
+
+_FENCE_RE = re.compile(r"```(?:[a-zA-Z0-9_+\-]*\n)?(.*?)```", re.DOTALL)
+
+# Canonical "Line N…:\n```block```" pattern: the ref ends with a colon and
+# is followed (with at most a small amount of whitespace) by a fenced block.
+# We only treat such blocks as authoritative for THIS ref, because random
+# fenced blocks elsewhere in the reply may belong to unrelated refs.
+_REF_FOLLOWED_BY_BLOCK_RE = re.compile(r":\s*\n+\s*```", re.DOTALL)
+
+
+def adjacent_fenced_block(reply, ref_match_end, max_gap=20):
+    """If the ref is immediately followed by a `:` + fenced block, return the
+    block content. Otherwise None.
+    """
+    tail = reply[ref_match_end:ref_match_end + 400]
+    # tail should look like "...some text...: \n```code```"
+    # We want the FIRST fenced block within `max_gap` characters after a colon.
+    m = _REF_FOLLOWED_BY_BLOCK_RE.search(tail)
+    if not m:
+        return None
+    # The fenced block starts at m.end() - 3 (the ``` we matched).
+    block_start = ref_match_end + m.end() - 3
+    block_match = _FENCE_RE.match(reply, block_start)
+    if not block_match:
+        return None
+    return block_match.group(1)
+
+
 # ── TF-IDF helpers ──────────────────────────────────────────────────────
 
 def _tokenize(text):
@@ -199,6 +225,15 @@ FEATURE_NAMES = [
     "context_has_colon", "context_has_code_block",
     # Distance from the original LLM claim (0 when scoring the claim itself)
     "distance_from_claim",
+    # 1 when scoring the line the LLM originally claimed, 0 otherwise.
+    # Lets the model learn the "claim is usually right" prior — replaces the
+    # hand-tuned DETECT_T gate.
+    "is_original_claim",
+    # How well this candidate line matches any fenced ```code``` block
+    # immediately following the ref. When the tutor writes "consider X on
+    # line N:\n```code```", the block is authoritative evidence; this lets the
+    # model see it.
+    "fenced_block_match_ratio",
 ]
 
 
@@ -215,7 +250,16 @@ def extract_features(ref, code_lines, full_response="", claim_line=None):
     start = ref["start"]
     end = ref.get("end") or start
     total = len(code_lines)
-    context = ref.get("context", "")
+
+    # If the ref is followed by ":\n```...```" — the canonical "here's what
+    # I mean" pattern — use the block as the canonical context. This prevents
+    # stale backticks from a previous turn's feedback from outweighing the
+    # ref's actual current evidence.
+    block = adjacent_fenced_block(full_response, ref.get("match_end", 0))
+    if block is not None:
+        context = block
+    else:
+        context = ref.get("context", "")
 
     if start < 1 or start > total:
         return None
@@ -223,6 +267,7 @@ def extract_features(ref, code_lines, full_response="", claim_line=None):
     if claim_line is None:
         claim_line = start
     distance_from_claim = abs(start - claim_line)
+    is_original_claim = 1 if start == claim_line else 0
 
     # ── Reference properties ──
     relative_position = start / total if total > 0 else 0
@@ -335,6 +380,23 @@ def extract_features(ref, code_lines, full_response="", claim_line=None):
     context_has_colon = 1 if re.search(r"[Ll]ines?\s+\d+\s*:", context) else 0
     context_has_code_block = 1 if "```" in context else 0
 
+    # ── Adjacent fenced-block match ──
+    # When the tutor wrote "ref:\n```block```", we already replaced `context`
+    # with the block content above. This separate feature still helps the
+    # model: it scores 1.0 when the candidate line appears verbatim in the
+    # block, providing a binary "this is the line" signal on top of the
+    # token-based features.
+    fenced_block_match_ratio = 0.0
+    if block is not None:
+        line_stripped = ref_line.strip()
+        line_tokens = set(re.findall(r"[a-zA-Z_]\w*", line_stripped.lower()))
+        block_lower = block.lower()
+        if line_stripped and line_stripped.lower() in block_lower:
+            fenced_block_match_ratio = 1.0
+        elif line_tokens:
+            block_tokens = set(re.findall(r"[a-zA-Z_]\w*", block_lower))
+            fenced_block_match_ratio = len(line_tokens & block_tokens) / len(line_tokens)
+
     return [
         start, total, relative_position, is_range, range_size, len(context),
         ref_blank, ref_comment, ref_code_len, ref_indent, ref_has_brace,
@@ -346,6 +408,8 @@ def extract_features(ref, code_lines, full_response="", claim_line=None):
         tfidf_best, tfidf_ratio,
         context_has_colon, context_has_code_block,
         distance_from_claim,
+        is_original_claim,
+        fenced_block_match_ratio,
     ]
 
 
@@ -435,25 +499,27 @@ def _replace_numbers(text, values):
     return "".join(out)
 
 
-def _p_wrong(model, scaler, features):
+def _score(model, scaler, features):
+    """Return the model's raw score for one candidate (higher = more likely correct)."""
     X = np.array([features])
     if scaler:
         X = scaler.transform(X)
+    if hasattr(model, "predict") and hasattr(model, "booster_"):
+        # LightGBM ranker — predict returns raw scores
+        return float(model.predict(X)[0])
+    # Backward-compat: classifier with predict_proba, score = p_correct
     if hasattr(model, "predict_proba"):
-        return float(model.predict_proba(X)[0][0])
-    return 1.0 if model.predict(X)[0] == 0 else 0.0
+        return float(model.predict_proba(X)[0][1])
+    return float(model.predict(X)[0])
 
 
 def fix_line_refs(reply, code):
     """Validate and fix line references in a tutor response.
 
-    Strategy:
-      1. Score the LLM's claim with the classifier (distance_from_claim = 0).
-      2. If `p_wrong(claim) >= DETECT_T`, score EVERY line of the file as a
-         candidate (distance_from_claim = |L - claim|). The model has learned
-         how distance from the claim should weigh against feature evidence.
-      3. Apply correction only if the best candidate is on the "correct" side
-         of the decision boundary AND clearly better than the claim.
+    Listwise: score the claim AND every other line in the file as candidates,
+    then pick the argmax. The LLM claim is part of the candidate set, marked by
+    the `is_original_claim` feature; the model decides whether to leave it
+    alone or to nominate a different line. No thresholds, no margins.
     """
     model_data = _load_model()
     if model_data is None:
@@ -474,18 +540,9 @@ def fix_line_refs(reply, code):
         if claim < 1 or claim > total:
             continue
 
-        features = extract_features(ref, code_lines, reply, claim_line=claim)
-        if features is None:
-            continue
-        p_claim = _p_wrong(model, scaler, features)
-        if p_claim < DETECT_T:
-            continue
-
-        best_p = p_claim
+        best_score = -float("inf")
         best_line = claim
         for cand in range(1, total + 1):
-            if cand == claim:
-                continue
             cand_ref = dict(ref)
             cand_ref["start"] = cand
             if ref.get("end") is not None:
@@ -493,21 +550,15 @@ def fix_line_refs(reply, code):
                 cand_ref["end"] = ref["end"] + shift
                 if cand_ref["end"] > total or cand_ref["end"] < cand:
                     continue
-            cand_feats = extract_features(
-                cand_ref, code_lines, reply, claim_line=claim
-            )
-            if cand_feats is None:
+            feats = extract_features(cand_ref, code_lines, reply, claim_line=claim)
+            if feats is None:
                 continue
-            cand_p = _p_wrong(model, scaler, cand_feats)
-            if cand_p < best_p:
-                best_p = cand_p
+            s = _score(model, scaler, feats)
+            if s > best_score:
+                best_score = s
                 best_line = cand
 
-        if (
-            best_line == claim
-            or best_p >= 0.5
-            or (p_claim - best_p) < ACCEPT_MARGIN
-        ):
+        if best_line == claim:
             continue
         start = claim  # name used by the rename block below
 

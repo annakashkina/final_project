@@ -466,7 +466,7 @@ function renderCode(idx) {
     langClass = null; // hljs auto-detect
     const name = lesson.title.toLowerCase().replace(/[^a-z0-9]+/g, "_");
     const langKey = lesson.series === "C++" ? "cpp" : lesson.series.toLowerCase();
-    const ext = Object.keys(EXT_LANG).find(e => EXT_LANG[e] === langKey) || "js";
+    const ext = Object.keys(EXT_LANG).find(e => EXT_LANG[e] === langKey) || lesson.extension;
     $("#file-tabs").innerHTML = `<span class="file-tab active">${name}.${ext}</span>`;
   }
 

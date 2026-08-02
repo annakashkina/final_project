@@ -17,12 +17,11 @@
     .study-box ul { color: var(--dim); display: inline-block; font-size: 13px; line-height: 1.6; margin: 0 auto 16px; text-align: left; }
     .study-label { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 13px; margin-bottom: 16px; cursor: pointer; }
     .study-label input { accent-color: var(--green); width: 16px; height: 16px; }
-    .study-actions { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; }
-    .study-note { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 12px; margin: 14px 0; text-align: left; }
-    .progress-row { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+    .progress-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
     .progress-text { font-size: 12px; color: var(--dim); white-space: nowrap; font-family: var(--mono); }
     .progress-track { flex: 1; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
     .progress-fill { height: 100%; background: var(--accent); transition: width 0.3s ease; border-radius: 2px; }
+    .level-badge { display: inline-block; font-size: 11px; font-family: var(--mono); color: var(--dim); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; padding: 2px 8px; border: 1px solid var(--border); border-radius: 10px; }
     .q-code { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; margin-bottom: 16px; }
     .q-code .panel-bar { display: flex; align-items: center; padding: 4px 10px; border-bottom: 1px solid var(--border); background: var(--panel-bar); }
     .q-code .file-tab { font-family: var(--mono); font-size: 12px; color: var(--accent); padding: 4px 8px; }
@@ -35,15 +34,29 @@
     .q-hint { font-size: 11px; color: var(--dim); margin-bottom: 12px; }
     .q-actions { display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
     .q-actions .btn-primary { padding: 10px 24px; font-size: 14px; }
-    .q-feedback { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 12px 14px; margin-bottom: 16px; font-size: 13px; color: var(--dim); }
+    .q-feedback { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 14px 16px; margin-bottom: 16px; }
+    .fb-score { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+    .fb-label { font-size: 13px; font-weight: 600; }
+    .fb-text { font-size: 13px; color: var(--dim); line-height: 1.5; }
     .results-card { text-align: center; margin-bottom: 24px; }
     .results-score { font-size: 48px; font-weight: 700; color: var(--accent); line-height: 1; }
     .results-label { font-size: 13px; color: var(--dim); margin-top: 6px; }
+    .come-back { text-align: center; font-size: 13px; color: var(--dim); margin-top: 18px; padding: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; }
+    .come-back strong { color: var(--text); }
+    .chart-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 16px; margin: 20px 0; }
+    .chart-title { font-size: 12px; color: var(--dim); font-family: var(--mono); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+    #progression-chart { width: 100%; height: 180px; display: block; }
+    #progression-chart .axis { stroke: var(--border); stroke-width: 1; }
+    #progression-chart .axis-label { fill: var(--dim); font-size: 10px; font-family: var(--mono); }
+    #progression-chart .line { fill: none; stroke: var(--accent); stroke-width: 2; }
+    #progression-chart .dot { fill: var(--accent); }
+    #progression-chart .gridline { stroke: var(--border); stroke-width: 1; stroke-dasharray: 2 3; opacity: 0.5; }
     .results-list { display: flex; flex-direction: column; gap: 12px; }
     .result-item { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 14px; display: flex; gap: 12px; align-items: flex-start; }
     .result-score-badge { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: #fff; flex-shrink: 0; }
     .result-body { flex: 1; min-width: 0; }
     .result-concept { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+    .result-level { display: inline-block; font-size: 10px; font-family: var(--mono); color: var(--dim); text-transform: uppercase; letter-spacing: 0.5px; margin-right: 6px; }
     .result-answer { font-size: 12px; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 6px 8px; margin-bottom: 6px; white-space: pre-wrap; word-break: break-word; max-height: 90px; overflow-y: auto; }
     .result-feedback { font-size: 12px; color: var(--dim); }
     .results-actions { display: flex; justify-content: center; margin-top: 20px; }
@@ -53,21 +66,21 @@
   <header id="header">
     <div class="header-left">
       <span class="logo">codeprobe</span>
-      <span class="header-flow" id="study-title"></span>
+      <span class="header-flow" id="daily-title"></span>
     </div>
     <button id="theme-toggle" class="theme-toggle" title="Toggle theme"></button>
   </header>
 
   <div class="study-wrap">
-    <div id="study-screen">
+    <div id="intro-screen">
       <div class="study-box">
-        <h2 id="study-heading">C Comprehension Test</h2>
-        <p id="study-desc">Answer a short set of C programming questions. There is no waiting period.</p>
+        <h2 id="intro-heading">Daily Quiz</h2>
+        <p id="intro-desc">Five questions, one per difficulty level — beginner to expert. Same questions for everyone today. Comes back fresh tomorrow.</p>
         <label class="study-label">
           <input type="checkbox" id="consent-check">
-          <span>I agree to participate and have my responses recorded anonymously</span>
+          <span>I agree to have my responses recorded anonymously</span>
         </label>
-        <button id="consent-start" class="btn-primary" disabled>Start test</button>
+        <button id="consent-start" class="btn-primary" disabled>Start today's quiz</button>
       </div>
     </div>
 
@@ -76,13 +89,14 @@
         <span class="progress-text" id="progress-text"></span>
         <div class="progress-track"><div class="progress-fill" id="progress-fill"></div></div>
       </div>
+      <span class="level-badge" id="level-badge"></span>
       <div class="q-code">
         <div class="panel-bar"><span class="file-tab" id="q-filename"></span></div>
-        <pre><code id="q-code-display" class="language-c"></code></pre>
+        <pre><code id="q-code-display"></code></pre>
       </div>
       <div class="q-prompt" id="q-prompt"></div>
       <textarea id="q-answer" placeholder="Type your answer here..."></textarea>
-      <div class="q-hint" id="q-hint">Ctrl+Enter to submit. Feedback is shown only after the test is finished.</div>
+      <div class="q-hint" id="q-hint">Ctrl+Enter to submit. Feedback after each answer.</div>
       <div id="q-feedback" class="q-feedback hidden"></div>
       <div class="q-actions">
         <button id="q-submit" class="btn-primary">Submit answer</button>
@@ -95,12 +109,17 @@
         <div class="results-score" id="results-score"></div>
         <div class="results-label" id="results-label"></div>
       </div>
+      <div class="chart-wrap">
+        <div class="chart-title" id="chart-title">Last 30 days</div>
+        <svg id="progression-chart" viewBox="0 0 600 180" preserveAspectRatio="none"></svg>
+      </div>
       <div class="results-list" id="results-list"></div>
+      <div class="come-back" id="come-back"></div>
       <div class="results-actions" id="results-actions"></div>
     </div>
   </div>
 
   <div id="toast" class="toast hidden"></div>
-  <script type="module" src="study_app.js?v=4"></script>
+  <script type="module" src="daily_app.js?v=1"></script>
 </body>
 </html>

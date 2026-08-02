@@ -233,7 +233,7 @@ def _discover_tracks():
 _PAGES = _discover_tracks()
 _PAGES.update(_template_pages((
     ("/assessment", "_assessment.html", "C Comprehension Test"),
-    ("/study", "_study.html", "C Comprehension Test"),
+    ("/daily", "_daily.html", "Daily Quiz"),
 )))
 _INVITE_PAGE = _template_page("_invite.html", "CodeProbe Invite")
 
@@ -859,7 +859,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.send_header("X-Frame-Options", "DENY")
         self.send_header("Referrer-Policy", "strict-origin-when-cross-origin")
         self.send_header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
-        path_only = self.path.split("?", 1)[0]
+        path_only = getattr(self, "path", "").split("?", 1)[0]
         if path_only.endswith(".html") or "." not in path_only.rsplit("/", 1)[-1] or path_only.startswith("/dashboard") or path_only == "/privacy":
             self.send_header(
                 "Content-Security-Policy",

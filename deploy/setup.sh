@@ -25,7 +25,10 @@ apt update && apt install -y caddy
 
 echo "==> Install Python ML dependencies"
 apt install -y python3-pip
-pip3 install --break-system-packages numpy scikit-learn
+# Runtime only needs numpy + lightgbm. scipy is pulled in transitively by
+# lightgbm and is fine. scikit-learn was previously installed for the old
+# GBM_conservative classifier — no longer used.
+pip3 install --break-system-packages numpy lightgbm
 
 echo "==> Create app user"
 id codeprobe &>/dev/null || useradd --system --create-home --home-dir /opt/codeprobe --shell /usr/sbin/nologin codeprobe

@@ -1,5 +1,5 @@
 /* @codeprobe-track
-{"title": "codeprobe — Rust: Zero to Hero", "order": 30, "icon": "🦀", "name": "Rust: Zero to Hero", "description": "A comprehensive Rust programming course. From hello world to async, unsafe, and real project architecture — ace every lesson and become a ready Rust programmer.", "meta": ["59 lessons", "17 series", "Beginner → Expert"]}
+{"title": "codeprobe — Rust: Zero to Hero", "section": "Programming concepts", "order": 1, "icon": "🦀", "name": "Rust: Zero to Hero", "description": "A comprehensive Rust programming course. From hello world to async, unsafe, and real project architecture — ace every lesson and become a ready Rust programmer.", "meta": ["59 lessons", "17 series", "Beginner → Expert"]}
 */
 import { rustFoundations } from "./lessons/rust_foundations.js";
 import { rustOwnership } from "./lessons/rust_ownership.js";
@@ -40,6 +40,6 @@ export const series = [
 ];
 
 export const lessons = series.flatMap(s => {
-  for (const l of s.lessons) l.series = s.name;
+  for (const l of s.lessons) { l.series = s.name; l.extension = "rs"; }
   return s.lessons;
 });
