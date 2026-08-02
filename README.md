@@ -4,6 +4,8 @@ Active learning tool for codebases. Engineers learn by reading real code and bei
 
 An AI tutor guides the learner through code snippets, asks questions, and verifies understanding before moving on. Based on research showing that scaffolded AI (+127% practice gains, no exam loss) and retrieval practice (g=0.50) outperform passive reading and plain chatbots.
 
+**Tech stack:** Python 3 stdlib backend (no frameworks, no pip dependencies for the core), vanilla JS frontend (no build step), JSONL storage (no database), any OpenAI-compatible LLM provider, optional ML line-reference validator (LightGBM). Live at [codeprobe-app.dev](https://codeprobe-app.dev).
+
 ## Setup
 
 ```bash
@@ -25,6 +27,39 @@ Environment variables:
 | `LLM_MODEL` | Model identifier | `llama-3.3-70b-versatile` |
 
 Works with Groq, xAI, OpenAI, Ollama, or any provider with an OpenAI-compatible `/v1/chat/completions` endpoint.
+
+## Running tests
+
+```bash
+python3 -m pytest tests/ -v              # full suite: 164 tests, < 1 second
+python3 tests/test_frontend_runner.py    # JavaScript suite alone (needs Node)
+```
+
+Tests cover input validation, static-file security, path traversal, TOFU auth, rate limiting, GDPR export/deletion, data retention, cross-user isolation, and frontend logic. They run in temp directories with a stubbed LLM — no network, no real data.
+
+## Repository structure
+
+```
+serve.py            Backend: HTTP server, API, auth, rate limiting, LLM proxy (~900 lines, stdlib only)
+validator.py        ML line-reference validator (LightGBM ranker, HMAC-signed model)
+app.js              Frontend: lesson phases, chat, prompt construction
+lessons.js          Main track index; lessons_*.js = other tracks (auto-discovered)
+lessons/            Lesson content modules (C, C++, Python, Ruby, Rust, TypeScript, …)
+dashboard.html/js   Admin analytics dashboard (per-user event timelines)
+privacy.html        Privacy policy
+vendor/             Self-hosted highlight.js (BSD-3-Clause, see vendor/highlight.js/LICENSE)
+tests/              Automated test suite
+deploy/             Production deployment: deploy.sh, setup.sh, systemd unit
+data/               Runtime user data (JSONL, gitignored)
+```
+
+## Production deployment
+
+Automated via `deploy/deploy.sh` (rsync + `deploy/setup.sh` on the server): creates an unprivileged system user, installs Caddy with auto-HTTPS and security headers, generates secrets, signs the ML model, installs a hardened systemd unit (filesystem sandbox, 300 MB memory cap, auto-restart), and configures the firewall. Requirements: a Debian-based VPS with 512 MB RAM, a domain's A record, and your `.env`. Updates are `git pull` + `systemctl restart codeprobe` — no builds, no migrations.
+
+## ML line-reference validator
+
+The tutor cites specific code lines and sometimes gets them wrong. `validator.py` post-processes every response: each cited line is re-scored against every line in the file by a trained ranker (33 features: identifier overlap, TF-IDF similarity, backtick-span matching), and wrong references are rewritten in milliseconds before the learner sees them. The model file is HMAC-SHA256 signed and verified before loading; without a key the platform simply runs with validation off. Training pipeline and evaluation live in the project's `ml/` directory.
 
 ## Writing lessons
 
@@ -100,3 +135,15 @@ Each lesson gets its own id: to update the existing lesson without side-effects,
 ## Dashboard
 
 `/dashboard.html` shows per-user progress: lessons completed, questions asked, where learners struggled. Useful for tracking onboarding across a team.
+
+## Privacy
+
+No accounts, no cookies, no trackers, no PII. Ephemeral by default — nothing is stored unless the learner opts in. Data export and deletion are one click, retention is 90 days, and the server runs in the EU. Full policy at `/privacy`.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the branching strategy, commit conventions, and code style.
+
+## License
+
+MIT — see [LICENSE](LICENSE). Bundled third-party code: highlight.js v11.9.0 (BSD-3-Clause, [vendor/highlight.js/LICENSE](vendor/highlight.js/LICENSE)).
