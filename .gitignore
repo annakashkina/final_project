@@ -3,3 +3,6 @@ data/
 __pycache__/
 *.pkl.sig
 token
+
+# ML pipeline: generated corpora and feature CSVs are excluded (regenerable)
+ml/data/
